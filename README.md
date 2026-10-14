@@ -90,7 +90,35 @@ docker compose up -d --scale api=1
 
 `pdf-network` debe existir como red externa y el Traefik de `pdf-infrastructure` debe estar conectado a ella. Los labels configuran un router HTTPS en `websecure` con TLS. Ajustar router, entrypoint, certificados/TLS y host a la instancia real de Traefik. El compose fija límites de 1 CPU y 512 MiB; no configura `container_name`, por lo que permite réplicas.
 
-Para desarrollo sin Traefik: construir previamente `pdf-extractor-service:0.1.0` desde el repo del extractor, luego ejecutar `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`. La API publica `127.0.0.1:8002`; el Document Service se simula con `tests/fakes/documents.py`. También hay un fake del extractor (`tests/fakes/extractor.py`) para pruebas independientes.
+### Ejecución de desarrollo sin Traefik
+
+Prerrequisitos:
+
+- Crear la red externa una sola vez. Si ya existe, está bien:
+
+  ```powershell
+  docker network create pdf-network
+  ```
+
+- Tener la imagen `pdf-extractor-service:0.1.0`. Para construirla, ejecutar desde la raíz del repo del extractor (hoy el monolito `pdf-extractext`, donde existe `microservices/extractor`):
+
+  ```powershell
+  docker build --tag pdf-extractor-service:0.1.0 microservices/extractor
+  ```
+
+Desde este repo, levantar los servicios con ambos archivos Compose:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+La API publica `127.0.0.1:8002`; el Document Service se simula con `tests/fakes/documents.py`. También hay un fake del extractor (`tests/fakes/extractor.py`) para pruebas independientes.
+
+Para bajar los servicios:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
 
 ## Prueba e2e por Traefik
 
