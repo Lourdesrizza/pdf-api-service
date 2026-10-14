@@ -1,3 +1,5 @@
+# Override de desarrollo: usar SIEMPRE junto con docker-compose.yml
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 services:
   api:
     ports:
@@ -14,7 +16,6 @@ services:
       - pdf-network
   documents:
     build:
-      context: .
-      dockerfile: tests/fakes/Dockerfile
+      context: tests/fakes
     networks:
       - pdf-network
