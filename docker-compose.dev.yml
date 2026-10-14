@@ -1,0 +1,20 @@
+services:
+  api:
+    ports:
+      - "127.0.0.1:8002:8000"
+    environment:
+      EXTRACTOR_URL: http://extractor:8000
+      DOCUMENT_SERVICE_URL: http://documents:8000
+    depends_on:
+      - extractor
+      - documents
+  extractor:
+    image: pdf-extractor-service:0.1.0
+    networks:
+      - pdf-network
+  documents:
+    build:
+      context: .
+      dockerfile: tests/fakes/Dockerfile
+    networks:
+      - pdf-network

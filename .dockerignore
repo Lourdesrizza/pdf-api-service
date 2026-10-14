@@ -1,0 +1,10 @@
+.venv
+.uv-cache
+.uv-python
+.pytest_cache
+__pycache__
+.env
+.git
+tests
+docs
+scripts
