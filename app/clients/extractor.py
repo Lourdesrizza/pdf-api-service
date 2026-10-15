@@ -20,7 +20,7 @@ class ExtractorClient:
     async def extract(self, pdf: bytes) -> tuple[str, int]:
         try:
             response = await self.http.post(self.url, content=pdf, headers={"Content-Type": "application/pdf"}, timeout=self.timeout)
-        except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as exc:
+        except httpx.TransportError as exc:
             raise map_transport_error(exc, "extractor") from exc
         map_upstream_status(response, "extractor", extractor=True)
         try:

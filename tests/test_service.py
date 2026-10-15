@@ -106,6 +106,69 @@ def test_extractor_error_mapping(client, response, expected):
     assert set(result.json()) == {"error", "detail"}
 
 
+def test_extractor_429_maps_to_503(client):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
+        documents.get(f"/documents/checksum/{checksum}").mock(return_value=httpx.Response(404))
+        extractor.post("/extract").mock(return_value=httpx.Response(429))
+        result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
+    assert result.status_code == 503
+    assert set(result.json()) == {"error", "detail"}
+    assert result.headers["retry-after"] == "1"
+
+
+def test_extractor_503_maps_to_503(client):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
+        documents.get(f"/documents/checksum/{checksum}").mock(return_value=httpx.Response(404))
+        extractor.post("/extract").mock(return_value=httpx.Response(503))
+        result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
+    assert result.status_code == 503
+    assert set(result.json()) == {"error", "detail"}
+    assert result.headers["retry-after"] == "1"
+
+
+def test_extractor_500_remains_502(client):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
+        documents.get(f"/documents/checksum/{checksum}").mock(return_value=httpx.Response(404))
+        extractor.post("/extract").mock(return_value=httpx.Response(500))
+        result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
+    assert result.status_code == 502
+    assert set(result.json()) == {"error", "detail"}
+
+
+def test_extractor_remote_protocol_error_maps_to_503(client):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
+        documents.get(f"/documents/checksum/{checksum}").mock(return_value=httpx.Response(404))
+        extractor.post("/extract").mock(side_effect=httpx.RemoteProtocolError("connection dropped"))
+        result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
+    assert result.status_code == 503
+    assert set(result.json()) == {"error", "detail"}
+
+
+def test_document_service_503_maps_to_503(client):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents:
+        documents.get(f"/documents/checksum/{checksum}").mock(return_value=httpx.Response(503))
+        result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
+    assert result.status_code == 503
+    assert set(result.json()) == {"error", "detail"}
+    assert result.headers["retry-after"] == "1"
+
+
+def test_document_service_remote_protocol_error_maps_to_503(client):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents:
+        documents.get(f"/documents/checksum/{checksum}").mock(
+            side_effect=httpx.RemoteProtocolError("connection dropped")
+        )
+        result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
+    assert result.status_code == 503
+    assert set(result.json()) == {"error", "detail"}
+
+
 def test_timeout_and_connectivity_mapping(client):
     checksum = calculate_checksum(PDF)
     with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:

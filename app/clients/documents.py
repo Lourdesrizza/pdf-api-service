@@ -22,7 +22,7 @@ class DocumentClient:
     async def find_by_checksum(self, checksum: str) -> DocumentPayload | None:
         try:
             response = await self.http.get(f"{self.base_url}/documents/checksum/{checksum}", timeout=self.timeout)
-        except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as exc:
+        except httpx.TransportError as exc:
             raise map_transport_error(exc, "document service") from exc
         if response.status_code == 404:
             return None
@@ -34,7 +34,7 @@ class DocumentClient:
         body = {"checksum": checksum, "filename": filename, "extracted_text": content, "page_count": page_count}
         try:
             response = await self.http.post(f"{self.base_url}/documents", json=body, timeout=self.timeout)
-        except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as exc:
+        except httpx.TransportError as exc:
             raise map_transport_error(exc, "document service") from exc
         if response.status_code == 409:
             return None
