@@ -137,7 +137,7 @@ Los scripts esperan una primera respuesta `source=extracted` y la segunda `sourc
 
 ## Errores
 
-La forma pública es `{"error":"codigo","detail":"mensaje"}`. Los estados más comunes son 400 (PDF vacío o firma inválida), 413 (demasiado grande), 415 (tipo no soportado), 422 (validación o rechazo del extractor), 500 (error interno), 502 (respuesta/error upstream), 503 (servicio no disponible o API saturada; incluye `Retry-After` si aplica) y 504 (timeout upstream). Los detalles internos y trazas no se devuelven al cliente; se registran a stdout con request-id.
+La forma pública es `{"error":"codigo","detail":"mensaje"}`. Los estados más comunes son 400 (PDF vacío o firma inválida), 413 (demasiado grande), 415 (tipo no soportado), 422 (validación o rechazo del extractor), 500 (error interno), 502 (otros errores upstream), 503 (servicio no disponible, respuesta 429 o 503 de un servicio upstream, o API saturada; incluye `Retry-After` si aplica) y 504 (timeout upstream). Los detalles internos y trazas no se devuelven al cliente; se registran a stdout con request-id.
 
 ## Decisiones y extensiones
 

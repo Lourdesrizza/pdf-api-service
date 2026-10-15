@@ -1,5 +1,7 @@
 # Contratos entre servicios
 
+Las respuestas 429 y 503 de cualquiera de los servicios upstream se devuelven como 503 en la API, con `Retry-After: 1`.
+
 ## Extractor (implementado por Maite)
 
 - `GET /health` responde `{"status":"ok","service":"extractor"}`.
