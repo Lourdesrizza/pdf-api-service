@@ -8,7 +8,7 @@ records: dict[str, dict] = {}
 class CreateDocument(BaseModel):
     checksum: str
     filename: str
-    extracted_text: str
+    content: str
     page_count: int | None = None
 
 
@@ -17,7 +17,7 @@ def health():
     return {"status": "ok", "service": "documents-fake"}
 
 
-@app.get("/documents/checksum/{checksum}")
+@app.get("/documents/by-checksum/{checksum}")
 def find(checksum: str):
     if checksum not in records:
         raise HTTPException(404, "not found")

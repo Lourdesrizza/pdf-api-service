@@ -13,10 +13,10 @@ Las respuestas 429 y 503 de cualquiera de los servicios upstream se devuelven co
 Contrato adaptado en `app/clients/documents.py`; confirmar rutas, nombres y códigos con Angelina antes de integrar servicios reales.
 
 - `GET /health` responde 200 si está disponible.
-- `GET /documents/checksum/{checksum}` responde 200 `{id, filename, checksum, extracted_text, created_at}` o 404.
-- `POST /documents` recibe `{filename, checksum, extracted_text, page_count}` y responde 201 con el documento creado; 409 indica duplicado.
+- `GET /documents/by-checksum/{checksum}` responde 200 `{id, filename, checksum, content, page_count, created_at}` o 404.
+- `POST /documents` recibe `{filename, checksum, content, page_count}` y responde 201 con el documento creado, o 200 con el documento existente si el checksum ya estaba guardado.
 - `page_count` es opcional en las respuestas, por compatibilidad con documentos históricos.
-- El adaptador traduce `extracted_text` del servicio a `content` en la API pública. La respuesta acepta el contenido bajo `extracted_text` o `content`.
+- La API usa `content` y `page_count` tal como los publica el Document Service; no hay traducción de campos.
 - El ID se proyecta como `document_id` (string) en la API pública.
 
 La propuesta de POST, su campo `page_count`, el `409` de unicidad, el endpoint de health y la forma del identificador requieren confirmación. El flujo reconsulta el checksum después de un `409` para resolver carreras.

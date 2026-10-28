@@ -1,4 +1,4 @@
-"""Document Service contract adapter. Confirm the pending fields with Angelina."""
+"""Cliente HTTP del Document Service (contrato: by-checksum, content y page_count)."""
 import httpx
 
 from app.clients.base import map_transport_error, map_upstream_status
@@ -21,7 +21,9 @@ class DocumentClient:
 
     async def find_by_checksum(self, checksum: str) -> DocumentPayload | None:
         try:
-            response = await self.http.get(f"{self.base_url}/documents/checksum/{checksum}", timeout=self.timeout)
+            response = await self.http.get(
+                f"{self.base_url}/documents/by-checksum/{checksum}", timeout=self.timeout
+            )
         except httpx.TransportError as exc:
             raise map_transport_error(exc, "document service") from exc
         if response.status_code == 404:
@@ -30,10 +32,11 @@ class DocumentClient:
         return self._parse(response)
 
     async def create(self, *, checksum: str, filename: str, content: str, page_count: int) -> DocumentPayload | None:
-        # Compatibility adapter: Document Service currently names content `extracted_text`.
-        body = {"checksum": checksum, "filename": filename, "extracted_text": content, "page_count": page_count}
+        body = {"checksum": checksum, "filename": filename, "content": content, "page_count": page_count}
         try:
-            response = await self.http.post(f"{self.base_url}/documents", json=body, timeout=self.timeout)
+            response = await self.http.post(
+                f"{self.base_url}/documents", json=body, timeout=self.timeout
+            )
         except httpx.TransportError as exc:
             raise map_transport_error(exc, "document service") from exc
         if response.status_code == 409:
