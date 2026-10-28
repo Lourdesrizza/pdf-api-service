@@ -1,0 +1,26 @@
+# Stack de PRUEBAS aislado: API + fakes del extractor y de documentos.
+# No es la integración real. Usa su propia red y nombres exclusivos.
+#   docker compose -f docker-compose.test.yml up --build -d
+name: pdf-api-test
+services:
+  api:
+    build: .
+    environment:
+      EXTRACTOR_URL: http://fake-extractor:8000
+      DOCUMENT_SERVICE_URL: http://fake-documents:8000
+      MAX_UPLOAD_BYTES: "20971520"
+    ports:
+      - "127.0.0.1:8002:8000"
+    depends_on:
+      - fake-extractor
+      - fake-documents
+  fake-extractor:
+    build:
+      context: tests/fakes
+      args:
+        FAKE_MODULE: extractor
+  fake-documents:
+    build:
+      context: tests/fakes
+      args:
+        FAKE_MODULE: documents

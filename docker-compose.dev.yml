@@ -1,21 +1,9 @@
-# Override de desarrollo: usar SIEMPRE junto con docker-compose.yml
+# Override de desarrollo: usar junto con docker-compose.yml.
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Solo publica la API en 127.0.0.1:8002. Las URLs de extractor y documentos salen
+# de EXTRACTOR_URL y DOCUMENT_SERVICE_URL (ver .env.example); los servicios reales
+# los levanta el compose de integración de pdf-infrastructure.
 services:
   api:
     ports:
       - "127.0.0.1:8002:8000"
-    environment:
-      EXTRACTOR_URL: http://extractor:8000
-      DOCUMENT_SERVICE_URL: http://documents:8000
-    depends_on:
-      - extractor
-      - documents
-  extractor:
-    image: pdf-extractor-service:0.1.0
-    networks:
-      - pdf-network
-  documents:
-    build:
-      context: tests/fakes
-    networks:
-      - pdf-network
