@@ -12,7 +12,7 @@ sequenceDiagram
     participant E as Extractor
     U->>A: POST /process (PDF)
     A->>A: valida y calcula SHA-256
-    A->>D: GET /documents/checksum/{checksum}
+    A->>D: GET /documents/by-checksum/{checksum}
     alt existe
         D-->>A: documento
         A-->>U: source=existing
@@ -26,7 +26,7 @@ sequenceDiagram
     end
 ```
 
-Si el POST de creación devuelve 409 por una carrera, la API vuelve a consultar por checksum y devuelve el documento existente.
+El Document Service responde 201 cuando guarda un documento nuevo y 200 cuando el checksum ya estaba guardado. Si el POST de creación devuelve 409 por una carrera, la API vuelve a consultar por checksum y devuelve el documento existente.
 
 ## Endpoints
 
@@ -58,7 +58,7 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 | `EXTRACTOR_URL` | `http://extractor:8000` | URL base del extractor |
 | `DOCUMENT_SERVICE_URL` | `http://documents:8000` | URL base de documentos |
 | `PORT` | `8000` | Puerto HTTP |
-| `MAX_UPLOAD_BYTES` | `10485760` | Máximo de carga, 10 MiB |
+| `MAX_UPLOAD_BYTES` | `20971520` | Máximo de carga, 20 MiB |
 | `EXTRACTOR_TIMEOUT_SECONDS` | `30` | Timeout de extracción |
 | `DOCUMENT_TIMEOUT_SECONDS` | `5` | Timeout de llamadas a documentos |
 | `READY_CHECK_TIMEOUT_SECONDS` | `2` | Timeout por health check |
@@ -141,6 +141,6 @@ La forma pública es `{"error":"codigo","detail":"mensaje"}`. Los estados más c
 
 ## Decisiones y extensiones
 
-La validación de frontera ocurre antes de llamar al extractor. SHA-256 se calcula en memoria y los bytes se envían directamente. Las llamadas de red comparten un único `httpx.AsyncClient` por ciclo de vida, con límites de conexiones y timeouts específicos por dependencia. `DocumentClient` concentra el contrato sujeto a confirmación, incluido el mapeo `extracted_text` ↔ `content`; ver [`docs/contracts.md`](docs/contracts.md).
+La validación de frontera ocurre antes de llamar al extractor. SHA-256 se calcula en memoria y los bytes se envían directamente. Las llamadas de red comparten un único `httpx.AsyncClient` por ciclo de vida, con límites de conexiones y timeouts específicos por dependencia. `DocumentClient` concentra el contrato con Documents (ruta por checksum, `content` y `page_count`); ver [`docs/contracts.md`](docs/contracts.md).
 
 No hay caché Redis. `ResultCache` y `NullResultCache` en `app/cache.py` dejan el punto de extensión; las mediciones baseline deben realizarse sin caché para no alterar los resultados.
