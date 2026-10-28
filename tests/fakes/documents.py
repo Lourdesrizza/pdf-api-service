@@ -13,6 +13,7 @@ class CreateDocument(BaseModel):
 
 
 @app.get("/health")
+@app.get("/health/ready")
 def health():
     return {"status": "ok", "service": "documents-fake"}
 

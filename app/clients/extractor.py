@@ -12,7 +12,7 @@ class ExtractorClient:
 
     async def health(self, timeout: float) -> bool:
         try:
-            response = await self.http.get(self.url.rsplit("/", 1)[0] + "/health", timeout=timeout)
+            response = await self.http.get(self.url.rsplit("/", 1)[0] + "/health/ready", timeout=timeout)
             return response.status_code == 200
         except httpx.HTTPError:
             return False

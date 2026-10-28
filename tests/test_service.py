@@ -47,8 +47,8 @@ def test_checksum_deterministic():
 def test_health_openapi_and_ready(client):
     assert client.get("/health").json() == {"status": "ok", "service": "api"}
     with respx.mock(base_url=EXTRACTOR) as extractor, respx.mock(base_url=DOCUMENTS) as documents:
-        extractor.get("/health").mock(return_value=httpx.Response(200))
-        documents.get("/health").mock(return_value=httpx.Response(200))
+        extractor.get("/health/ready").mock(return_value=httpx.Response(200))
+        documents.get("/health/ready").mock(return_value=httpx.Response(200))
         assert client.get("/ready").status_code == 200
     paths = client.get("/openapi.json").json()["paths"]
     assert {"/process", "/health", "/ready"}.issubset(paths)
@@ -202,8 +202,8 @@ def test_document_service_down(client):
 
 def test_ready_degraded(client):
     with respx.mock(base_url=EXTRACTOR) as extractor, respx.mock(base_url=DOCUMENTS) as documents:
-        extractor.get("/health").mock(return_value=httpx.Response(503))
-        documents.get("/health").mock(return_value=httpx.Response(200))
+        extractor.get("/health/ready").mock(return_value=httpx.Response(503))
+        documents.get("/health/ready").mock(return_value=httpx.Response(200))
         result = client.get("/ready")
     assert result.status_code == 503
     assert result.json()["dependencies"]["extractor"] == "unavailable"

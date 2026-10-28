@@ -32,7 +32,7 @@ El Document Service responde 201 cuando guarda un documento nuevo y 200 cuando e
 
 - `POST /process`: acepta `application/pdf` binario o `multipart/form-data` con campo `file`. En binario puede enviarse `X-Filename`; si el nombre no termina en `.pdf` se usa `document.pdf`.
 - `GET /health`: liveness, sin consultar dependencias.
-- `GET /ready`: consulta `/health` de extractor y Document Service.
+- `GET /ready`: consulta `/health/ready` de extractor y Document Service.
 - `/docs` y `/openapi.json`: contrato interactivo.
 
 Ejemplos PowerShell:

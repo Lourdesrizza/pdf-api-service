@@ -14,7 +14,7 @@ class DocumentClient:
 
     async def health(self, timeout: float) -> bool:
         try:
-            response = await self.http.get(f"{self.base_url}/health", timeout=timeout)
+            response = await self.http.get(f"{self.base_url}/health/ready", timeout=timeout)
             return response.status_code == 200
         except httpx.HTTPError:
             return False

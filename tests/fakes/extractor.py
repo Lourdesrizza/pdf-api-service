@@ -4,6 +4,7 @@ app = FastAPI()
 
 
 @app.get("/health")
+@app.get("/health/ready")
 def health():
     return {"status": "ok", "service": "extractor-fake"}
 
