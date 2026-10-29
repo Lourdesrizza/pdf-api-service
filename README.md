@@ -78,7 +78,7 @@ uv run --locked pytest -v
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-La suite no requiere servicios remotos; los mocks se hacen con `respx`. La prueba marcada `integration` se omite si no se definen `EXTRACTOR_URL` y `DOCUMENT_SERVICE_URL`.
+La suite unitaria usa mocks con `respx`. `tests/test_integration.py` se omite por defecto; para habilitarla hay que establecer `API_DEDICATED_TEST_ENV=1` y `API_TEST_URL` hacia un stack exclusivo con una base vacía. Usa el fixture local de una página `tests/fixtures/sample.pdf`; no es el conjunto oficial de carga del Extractor.
 
 ## Docker y Traefik
 
@@ -90,50 +90,35 @@ docker compose up -d --scale api=1
 
 `pdf-network` debe existir como red externa y el Traefik de `pdf-infrastructure` debe estar conectado a ella. Los labels configuran un router HTTPS en `websecure` con TLS. Ajustar router, entrypoint, certificados/TLS y host a la instancia real de Traefik. El compose fija límites de 1 CPU y 512 MiB; no configura `container_name`, por lo que permite réplicas.
 
-### Ejecución de desarrollo sin Traefik
+### Pruebas aisladas con fakes
 
-Prerrequisitos:
-
-- Crear la red externa una sola vez. Si ya existe, está bien:
-
-  ```powershell
-  docker network create pdf-network
-  ```
-
-- Tener la imagen `pdf-extractor-service:0.1.0`. Para construirla, ejecutar desde la raíz del repo del extractor (hoy el monolito `pdf-extractext`, donde existe `microservices/extractor`):
-
-  ```powershell
-  docker build --tag pdf-extractor-service:0.1.0 microservices/extractor
-  ```
-
-Desde este repo, levantar los servicios con ambos archivos Compose:
+Stack propio, separado de servicios reales. Dev y test publican 8002: usar uno por vez.
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.test.yml up --build -d
+curl.exe http://127.0.0.1:8002/ready
+docker compose -f docker-compose.test.yml down
 ```
 
-La API publica `127.0.0.1:8002`; el Document Service se simula con `tests/fakes/documents.py`. También hay un fake del extractor (`tests/fakes/extractor.py`) para pruebas independientes.
+## Integración real en un entorno dedicado
 
-Para bajar los servicios:
+La integración API → Extractor real → Documents real → MongoDB 7 se ejecutó el 29/10/2026. El resultado resumido está en [`integration/real-stack/results/2026-10-29-summary.json`](integration/real-stack/results/2026-10-29-summary.json). El Compose y los probes reproducibles están en [`integration/real-stack/README.md`](integration/real-stack/README.md); no dependen de la carpeta externa de logs. No se versionan PDFs: el generador crea dos fixtures sintéticos pequeños en una carpeta ignorada. No son los PDFs oficiales de carga.
+
+El stack de prueba usa su propia red interna, un servicio por réplica, caché del Extractor desactivada, métricas habilitadas y cliente interno. No publica puertos, no se conecta a `pdf-network` y no contiene Redis. Traefik es una instancia exclusiva con proveedor de archivo, sin dashboard ni socket Docker. La prueba confirmó esa ruta aislada; no valida el DNS, TLS ni el Traefik compartido.
+
+Para reproducir en Windows PowerShell, con los tres checkouts ya disponibles y los commits de Extractor/Documents indicados en la guía:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+.\integration\real-stack\run.ps1 `
+  -ApiRepoPath (Resolve-Path .).Path `
+  -ExtractorRepoPath 'C:\dev\pdf-proyecto\pdf-extractor-service-review' `
+  -DocumentsRepoPath 'C:\dev\pdf-proyecto\pdf-document-service-review' `
+  -RunIntegration
 ```
 
-## Prueba e2e por Traefik
+El script valida remoto y commit de los clones hermanos, genera los fixtures, valida la configuración aislada, construye y levanta el stack, ejecuta el flujo, registra resultados bajo `integration/real-stack/run/` y limpia contenedores/red en un bloque `finally`. Las imágenes se conservan. Si la consola se interrumpe antes de completar la limpieza, ejecutar `.\integration\real-stack\run.ps1 -CleanupOnly`.
 
-Con los servicios arriba y un PDF local:
-
-```powershell
-.\scripts\e2e.ps1 -PdfPath .\informe.pdf
-```
-
-```bash
-chmod +x scripts/e2e.sh
-./scripts/e2e.sh ./informe.pdf
-```
-
-Los scripts esperan una primera respuesta `source=extracted` y la segunda `source=existing`; usar un documento que no haya sido cargado previamente.
+Los scripts `scripts/e2e.ps1` y `scripts/e2e.sh` siguen sirviendo para un endpoint dedicado publicado/alcanzable desde el host. No apuntarlos al Compose de integración anterior: ese cliente no publica puertos y accede a la API desde su red interna.
 
 ## Errores
 
@@ -143,4 +128,14 @@ La forma pública es `{"error":"codigo","detail":"mensaje"}`. Los estados más c
 
 La validación de frontera ocurre antes de llamar al extractor. SHA-256 se calcula en memoria y los bytes se envían directamente. Las llamadas de red comparten un único `httpx.AsyncClient` por ciclo de vida, con límites de conexiones y timeouts específicos por dependencia. `DocumentClient` concentra el contrato con Documents (ruta por checksum, `content` y `page_count`); ver [`docs/contracts.md`](docs/contracts.md).
 
-No hay caché Redis. `ResultCache` y `NullResultCache` en `app/cache.py` dejan el punto de extensión; las mediciones baseline deben realizarse sin caché para no alterar los resultados.
+La API no usa caché Redis; la medición baseline se realiza sin caché para no alterar los resultados.
+
+## Contrato actualizado
+
+source expresa creación/existencia: POST Documents 201 produce extracted, POST 200 produce existing. En una carrera puede haber extracción previa al duplicado. 409 excepcional provoca reconsulta.
+El límite de 20971520 bytes es sobre todo el cuerpo, incluido el envoltorio multipart. Mantener PORT=8000 en Docker.
+Extractor 400/415: API 422; 413: 413; 429/503: 503. Timeout: 504; conexión/respuesta inválida: 502. No se devuelve detail remoto. Logging a stdout.
+
+## Carga simple de la API
+
+El runbook de [`integration/real-stack`](integration/real-stack/README.md) ejecuta la carga breve dentro de la red interna: 1 worker, 5 segundos, PDF repetido. El 29/10/2026 obtuvo 29 respuestas, 0 errores y todas `existing` (5,79 requests/s; p50 18,3 ms; p95 73,6 ms). Mide principalmente deduplicación, no extracción de PDFs nuevos ni el benchmark oficial del Extractor. `scripts/check_api.py` permite repetir la carga contra un endpoint expresamente dedicado; no usar el despliegue compartido.
