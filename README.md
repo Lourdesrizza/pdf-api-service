@@ -38,16 +38,21 @@ El Document Service responde 201 cuando guarda un documento nuevo y 200 cuando e
 Ejemplos PowerShell:
 
 ```powershell
-curl.exe -k -X POST https://api.universidad.localhost/process `
+curl.exe -X POST http://api.universidad.localhost/process `
   -H "Content-Type: application/pdf" -H "X-Filename: informe.pdf" `
   --data-binary "@.\informe.pdf"
 
-curl.exe -k -X POST https://api.universidad.localhost/process `
+curl.exe -X POST http://api.universidad.localhost/process `
   -F "file=@.\informe.pdf;type=application/pdf"
 
-curl.exe -k https://api.universidad.localhost/health
-curl.exe -k https://api.universidad.localhost/ready
+curl.exe http://api.universidad.localhost/health
+curl.exe http://api.universidad.localhost/ready
 ```
+
+El Compose de integración revisado de `pdf-infrastructure` publica el router de
+la API en el entrypoint `web` (HTTP, puerto 80) y no configura TLS. Si el equipo
+habilita TLS en otro entorno, usar su hostname y certificado configurados y
+mantener la validación del certificado activa.
 
 ## Configuración
 
