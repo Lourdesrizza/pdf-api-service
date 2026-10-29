@@ -1,0 +1,1 @@
+sample.pdf: one page, text "PDF API integration fixture". Generated with reportlab Canvas(invariant=1), drawString(72,720,text), save(). ReportLab is a fixture-generation tool only, not a production dependency. Use a fresh dedicated database for the first-upload test. This fixture is not the missing 279-page PDF.

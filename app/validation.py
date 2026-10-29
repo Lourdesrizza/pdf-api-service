@@ -1,4 +1,8 @@
+from email import policy
+from email.parser import BytesParser
+
 from fastapi import Request
+
 from app.errors import APIError
 
 
@@ -15,10 +19,6 @@ async def read_limited_body(request: Request, max_bytes: int) -> bytes:
 
 def parse_multipart(body: bytes, content_type: str) -> tuple[bytes, str | None]:
     """Extract the `file` part from an already size-limited multipart body."""
-    from email.message import Message
-    from email.parser import BytesParser
-    from email import policy
-
     message = BytesParser(policy=policy.default).parsebytes(
         b"Content-Type: " + content_type.encode("latin-1") + b"\r\nMIME-Version: 1.0\r\n\r\n" + body
     )

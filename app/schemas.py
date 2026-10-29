@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -5,8 +7,8 @@ class ProcessResponse(BaseModel):
     document_id: str
     checksum: str
     content: str
-    page_count: int | None = None
-    source: str = Field(pattern="^(existing|extracted)$")
+    page_count: int = Field(strict=True, gt=0)
+    source: Literal["existing", "extracted"]
 
 
 class ErrorResponse(BaseModel):
@@ -16,14 +18,20 @@ class ErrorResponse(BaseModel):
 
 
 class DocumentPayload(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str | int
-    checksum: str
-    filename: str = "document.pdf"
-    content: str | None = None
-    extracted_text: str | None = None
-    page_count: int | None = None
+    model_config = ConfigDict(extra="ignore", strict=True)
+    id: str = Field(min_length=1)
+    checksum: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    content: str
+    page_count: int = Field(strict=True, gt=0)
 
-    @property
-    def resolved_content(self) -> str:
-        return self.content if self.content is not None else (self.extracted_text or "")
+
+class ExtractionResult(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    content: str
+    page_count: int = Field(gt=0)
+
+
+class DocumentCreation(BaseModel):
+    document: DocumentPayload
+    created: bool

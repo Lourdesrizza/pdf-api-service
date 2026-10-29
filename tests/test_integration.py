@@ -1,18 +1,25 @@
 import os
-
+import hashlib
+from pathlib import Path
+import httpx
 import pytest
-from fastapi.testclient import TestClient
-
-from app import main
-
 
 @pytest.mark.integration
-@pytest.mark.skipif(not (os.getenv("EXTRACTOR_URL") and os.getenv("DOCUMENT_SERVICE_URL")), reason="requires configured live services")
+@pytest.mark.skipif(os.getenv("API_DEDICATED_TEST_ENV")!="1" or not os.getenv("API_TEST_URL"),reason="requires explicit dedicated real stack")
 def test_live_process_round_trip():
-    main.settings.extractor_url = os.environ["EXTRACTOR_URL"]
-    main.settings.document_service_url = os.environ["DOCUMENT_SERVICE_URL"]
-    pdf = b"%PDF-1.4\n% integration smoke test"
-    with TestClient(main.app) as client:
-        response = client.post("/process", content=pdf, headers={"Content-Type": "application/pdf", "X-Filename": "integration.pdf"})
-    assert response.status_code == 200, response.text
-    assert response.json()["checksum"]
+    pdf=Path(__file__).with_name("fixtures").joinpath("sample.pdf").read_bytes()
+    checksum=hashlib.sha256(pdf).hexdigest()
+    url=os.environ["API_TEST_URL"].rstrip("/")+"/process"
+    with httpx.Client(timeout=60) as client:
+        first=client.post(url,content=pdf,headers={"Content-Type":"application/pdf"})
+        assert first.status_code==200
+        a=first.json()
+        assert a["source"]=="extracted", "Fixture must be absent in dedicated database"
+        assert a["checksum"]==checksum and a["document_id"]
+        assert a["page_count"]==1 and "PDF API integration fixture" in a["content"]
+        second=client.post(url,content=pdf,headers={"Content-Type":"application/pdf"})
+        assert second.status_code==200
+        b=second.json()
+        assert b["source"]=="existing"
+        assert b["document_id"]==a["document_id"] and b["checksum"]==checksum
+    # Separate extractor instrumentation is required to prove no second extraction.

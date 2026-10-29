@@ -30,7 +30,7 @@ def install_settings(monkeypatch, **kwargs):
 
 
 def doc(**overrides):
-    return {"id": "abc123", "checksum": calculate_checksum(PDF), "filename": "document.pdf", "content": "# text", **overrides}
+    return {"id": "abc123", "checksum": calculate_checksum(PDF), "filename": "document.pdf", "content": "# text", "page_count": 1, **overrides}
 
 
 @pytest.fixture
@@ -138,13 +138,13 @@ def test_extractor_500_remains_502(client):
     assert set(result.json()) == {"error", "detail"}
 
 
-def test_extractor_remote_protocol_error_maps_to_503(client):
+def test_extractor_remote_protocol_error_maps_to_502(client):
     checksum = calculate_checksum(PDF)
     with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
         documents.get(f"/documents/by-checksum/{checksum}").mock(return_value=httpx.Response(404))
         extractor.post("/extract").mock(side_effect=httpx.RemoteProtocolError("connection dropped"))
         result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
-    assert result.status_code == 503
+    assert result.status_code == 502
     assert set(result.json()) == {"error", "detail"}
 
 
@@ -158,14 +158,14 @@ def test_document_service_503_maps_to_503(client):
     assert result.headers["retry-after"] == "1"
 
 
-def test_document_service_remote_protocol_error_maps_to_503(client):
+def test_document_service_remote_protocol_error_maps_to_502(client):
     checksum = calculate_checksum(PDF)
     with respx.mock(base_url=DOCUMENTS) as documents:
         documents.get(f"/documents/by-checksum/{checksum}").mock(
             side_effect=httpx.RemoteProtocolError("connection dropped")
         )
         result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
-    assert result.status_code == 503
+    assert result.status_code == 502
     assert set(result.json()) == {"error", "detail"}
 
 
@@ -174,7 +174,7 @@ def test_timeout_and_connectivity_mapping(client):
     with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
         documents.get(f"/documents/by-checksum/{checksum}").mock(return_value=httpx.Response(404))
         extractor.post("/extract").mock(side_effect=httpx.ConnectError("secret host"))
-        assert client.post("/process", content=PDF, headers={"content-type": "application/pdf"}).status_code == 503
+        assert client.post("/process", content=PDF, headers={"content-type": "application/pdf"}).status_code == 502
     with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
         documents.get(f"/documents/by-checksum/{checksum}").mock(return_value=httpx.Response(404))
         extractor.post("/extract").mock(side_effect=httpx.ReadTimeout("internal"))
@@ -197,7 +197,7 @@ def test_document_service_down(client):
     with respx.mock(base_url=DOCUMENTS) as documents:
         documents.get(f"/documents/by-checksum/{checksum}").mock(side_effect=httpx.ConnectError("hidden"))
         result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
-    assert result.status_code == 503
+    assert result.status_code == 502
 
 
 def test_ready_degraded(client):
@@ -230,3 +230,20 @@ def test_backpressure_rejects_second_request(monkeypatch):
             thread.join(timeout=2)
     assert second.status_code == 503
     assert second.headers["retry-after"] == "1"
+
+
+def test_invalid_request_id_is_replaced(client):
+    result = client.get("/health", headers={"X-Request-ID": "x" * 129})
+    request_id = result.headers["X-Request-ID"]
+    assert len(request_id) == 32
+    assert all(32 <= ord(char) < 127 for char in request_id)
+
+
+def test_extractor_retry_after_is_forwarded_and_validated(client):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
+        documents.get(f"/documents/by-checksum/{checksum}").mock(return_value=httpx.Response(404))
+        extractor.post("/extract").mock(return_value=httpx.Response(429, headers={"Retry-After": "7"}))
+        result = client.post("/process", content=PDF, headers={"content-type": "application/pdf"})
+    assert result.status_code == 503
+    assert result.headers["retry-after"] == "7"
