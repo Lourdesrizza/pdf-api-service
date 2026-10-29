@@ -1,0 +1,130 @@
+{
+  "run_date": "2026-10-29",
+  "run_id": "20261029202204-7cdb782a",
+  "evidence_directory": "../run/20261029202204-7cdb782a/",
+  "purpose": "post-refactor production-code verification; separate from the historical 2026-10-29 summary",
+  "api": {
+    "remote": "https://github.com/Lourdesrizza/pdf-api-service.git",
+    "base_commit": "b8cf3026c6b75982dc116b1bb4ec2f8dee8114bb",
+    "source": "current local working tree; uncommitted changes included in build",
+    "image": "pdf-api-real:20261029202204-7cdb782a",
+    "image_id": "sha256:d38a0807a7d82c9bfc9540c3203db4479b8f952e584423d8a071e6277f41ebee",
+    "image_created": "2026-10-29T20:22:17.758211192Z"
+  },
+  "extractor": {
+    "remote": "https://github.com/MaitePuente/pdf-extractor-service.git",
+    "commit": "5f0de842ee1bcdcd23ce1383427f6b757d8882fa",
+    "cache_enabled": false,
+    "metrics_enabled": true,
+    "replicas": 1
+  },
+  "documents": {
+    "remote": "https://github.com/angelina-magallanes/pdf-document-service.git",
+    "commit": "8e1214d0ec82df3806c096840e3dea12defe69d5"
+  },
+  "mongodb": "7.0.45",
+  "traefik": "3.6.25 (exclusive file-provider instance)",
+  "isolation": {
+    "project": "pdf-api-real-20261029202204-7cdb782a",
+    "network": "pdf-api-real-20261029202204-7cdb782a_isolated",
+    "internal_only": true,
+    "published_ports": false,
+    "shared_pdf_network": false,
+    "redis": false
+  },
+  "primary_pdf": {
+    "bytes": 608,
+    "sha256": "874290b0b155bc89c5ac083226ee5c854d2dee76f15ab0e8133d4845444cdc0f",
+    "pages": 1,
+    "expected_text": "ISOLATED PDF API EXTRACTION PROOF"
+  },
+  "primary_flow": {
+    "health": 200,
+    "ready": 200,
+    "ready_dependencies": {
+      "extractor": "ok",
+      "documents": "ok"
+    },
+    "first_process": {
+      "status": 200,
+      "source": "extracted",
+      "document_id": "6ae3ab36e8b7fe4e6f59e58b"
+    },
+    "second_process": {
+      "status": 200,
+      "source": "existing",
+      "document_id": "6ae3ab36e8b7fe4e6f59e58b",
+      "same_checksum": true
+    },
+    "extract_post_total": [
+      0,
+      1,
+      1
+    ]
+  },
+  "invalid_pdf": {
+    "invalid_signature": {
+      "status": 400,
+      "error": "invalid_pdf",
+      "reaches_extractor": false
+    },
+    "signature_valid_but_malformed": {
+      "status": 422,
+      "error": "pdf_rejected",
+      "reaches_extractor": true
+    }
+  },
+  "concurrency_and_persistence": {
+    "concurrent_requests": 2,
+    "statuses": [
+      200,
+      200
+    ],
+    "sources": [
+      "extracted",
+      "existing"
+    ],
+    "same_document_id": true,
+    "unique_checksum_index": true,
+    "documents_after_restart": 2,
+    "primary_after_documents_restart": "existing",
+    "extract_post_total_before_after_persistence_probe": [
+      4,
+      4
+    ]
+  },
+  "exclusive_traefik": {
+    "health": 200,
+    "ready": 200,
+    "process_existing": 200,
+    "extract_post_total_before_after": [
+      2,
+      2
+    ],
+    "shared_traefik_tested": false
+  },
+  "dependency_errors": {
+    "extractor_stopped": {
+      "ready": 503,
+      "process": 502,
+      "error": "upstream_unavailable"
+    },
+    "documents_stopped": {
+      "ready": 503,
+      "process": 502,
+      "error": "upstream_unavailable"
+    }
+  },
+  "api_load": {
+    "skipped": true,
+    "reason": "Explicitly omitted for this post-refactor verification"
+  },
+  "cleanup": {
+    "containers_removed": true,
+    "project_network_removed": true,
+    "verified_no_remaining_matching_containers_or_networks": true,
+    "images_retained": true,
+    "ignored_run_evidence_retained": true
+  },
+  "not_group_complete": true
+}

@@ -1,0 +1,130 @@
+{
+  "run_date": "2026-10-29",
+  "api": {
+    "remote": "https://github.com/Lourdesrizza/pdf-api-service.git",
+    "base_commit": "b8cf3026c6b75982dc116b1bb4ec2f8dee8114bb",
+    "source": "local working tree with uncommitted changes at test time"
+  },
+  "extractor": {
+    "remote": "https://github.com/MaitePuente/pdf-extractor-service.git",
+    "commit": "5f0de842ee1bcdcd23ce1383427f6b757d8882fa",
+    "cache_enabled": false,
+    "metrics_enabled": true,
+    "replicas": 1
+  },
+  "documents": {
+    "remote": "https://github.com/angelina-magallanes/pdf-document-service.git",
+    "commit": "8e1214d0ec82df3806c096840e3dea12defe69d5"
+  },
+  "mongodb": "7.0.45",
+  "traefik": {
+    "version": "3.6.25",
+    "scope": "dedicated file-provider instance; not shared Traefik"
+  },
+  "isolation": {
+    "compose_project": "api-real-documents-20261029164147-5fa2d721",
+    "network": "internal Compose-managed network",
+    "uses_pdf_network": false,
+    "published_ports": false,
+    "redis": false,
+    "replicas": 1
+  },
+  "primary_pdf": {
+    "bytes": 608,
+    "sha256": "874290b0b155bc89c5ac083226ee5c854d2dee76f15ab0e8133d4845444cdc0f",
+    "pages": 1,
+    "expected_text": "ISOLATED PDF API EXTRACTION PROOF"
+  },
+  "primary_flow": {
+    "health": 200,
+    "ready": 200,
+    "first_process": {
+      "status": 200,
+      "source": "extracted"
+    },
+    "second_process": {
+      "status": 200,
+      "source": "existing",
+      "same_document_id": true,
+      "same_checksum": true
+    },
+    "extract_post_total": [
+      0,
+      1,
+      1
+    ]
+  },
+  "invalid_pdf": {
+    "signature_rejected_by_api": {
+      "status": 400,
+      "extractor_counter_unchanged": true
+    },
+    "malformed_pdf_rejected_by_extractor": {
+      "status": 422,
+      "public_error": "pdf_rejected",
+      "extractor_counter_incremented": 1
+    }
+  },
+  "concurrency": {
+    "parallel_requests": 2,
+    "statuses": [
+      200,
+      200
+    ],
+    "sources": [
+      "extracted",
+      "existing"
+    ],
+    "same_document_id": true,
+    "mongo_unique_checksum_index": true
+  },
+  "documents_restart": {
+    "ready": 200,
+    "stored_pdf_source": "existing",
+    "extract_counter_before_after": [
+      4,
+      4
+    ],
+    "mongo_document_count": 2
+  },
+  "exclusive_traefik": {
+    "health": 200,
+    "ready": 200,
+    "process_existing": 200,
+    "extract_counter_increment": 0,
+    "shared_ingress_tested": false
+  },
+  "dependency_stops": {
+    "extractor_down": {
+      "ready": 503,
+      "process": 502
+    },
+    "documents_down": {
+      "ready": 503,
+      "process": 502
+    }
+  },
+  "api_load": {
+    "duration_seconds": 5,
+    "workers": 1,
+    "requests": 29,
+    "errors": 0,
+    "requests_per_second": 5.79,
+    "p50_ms": 18.3,
+    "p95_ms": 73.6,
+    "source_existing": 29,
+    "source_extracted": 0
+  },
+  "cleanup": {
+    "test_containers_removed": true,
+    "test_network_removed": true,
+    "test_images_retained": true
+  },
+  "pending_external": [
+    "Provide the four official stress PDFs; tests/stress/pdfs/ is absent from the reviewed checkouts.",
+    "Provide pdf279hojas.pdf (279 pages, 17,749,468 bytes; supplied SHA-256 reference is abbreviated as 728c8a…713162). The antecedent checkout README instead names documento_279_paginas.pdf; confirm the canonical filename and full hash.",
+    "Test DNS/TLS and routing through shared Traefik in an authorized environment.",
+    "Run the official k6/Vegeta extractor benchmark with its official dataset in the Extractor-owned environment."
+  ],
+  "not_group_complete": true
+}

@@ -1,0 +1,12 @@
+http:
+  routers:
+    isolated-api:
+      entryPoints:
+        - web
+      rule: Host(`api.test`)
+      service: isolated-api
+  services:
+    isolated-api:
+      loadBalancer:
+        servers:
+          - url: http://api:8000
