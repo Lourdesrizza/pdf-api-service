@@ -3,6 +3,7 @@ param(
     [string]$ApiRepoPath,
     [string]$ExtractorRepoPath,
     [string]$DocumentsRepoPath,
+    [string]$PdfPath,
     [switch]$RunIntegration,
     [switch]$SkipLoad,
     [switch]$CleanupOnly
@@ -15,7 +16,8 @@ $runPath = $runRoot
 $metadataPath = Join-Path $runRoot 'last-run.json'
 $environmentNames = @(
     'COMPOSE_PROJECT_NAME', 'API_REPO_PATH', 'EXTRACTOR_REPO_PATH', 'DOCUMENTS_REPO_PATH',
-    'API_IMAGE', 'EXTRACTOR_IMAGE', 'DOCUMENTS_IMAGE', 'MONGO_DATABASE', 'RUN_DIRECTORY'
+    'API_IMAGE', 'EXTRACTOR_IMAGE', 'DOCUMENTS_IMAGE', 'MONGO_DATABASE', 'RUN_DIRECTORY',
+    'PRIMARY_EXPECTED_PAGE_COUNT', 'PRIMARY_EXPECTED_TEXT'
 )
 $previousEnvironment = @{}
 foreach ($name in $environmentNames) {
@@ -23,6 +25,7 @@ foreach ($name in $environmentNames) {
 }
 $projectStarted = $false
 $composeBase = @()
+$copiedProofPath = $null
 
 function Set-ComposeEnvironment($metadata) {
     $env:COMPOSE_PROJECT_NAME = $metadata.project
@@ -116,6 +119,34 @@ try {
     $safeDatabase = 'pdf_api_' + $runId.Replace('-', '_')
     $runPath = Join-Path $runRoot $runId
     New-Item -ItemType Directory -Path $runPath -Force | Out-Null
+    $primaryPdfMetadata = $null
+    if ($PdfPath) {
+        $resolvedPdfPath = (Resolve-Path -LiteralPath $PdfPath).Path
+        $pdfFile = Get-Item -LiteralPath $resolvedPdfPath
+        $pdfSha256 = (Get-FileHash -LiteralPath $resolvedPdfPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($pdfFile.Length -ne 17749468) { throw "Unexpected large PDF size: $($pdfFile.Length) bytes" }
+        if ($pdfSha256 -ne '728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162') {
+            throw "Unexpected large PDF SHA-256: $pdfSha256"
+        }
+        $pdfInfo = & pdfinfo $resolvedPdfPath 2>&1
+        if ($LASTEXITCODE -ne 0) { throw 'pdfinfo could not read the supplied PDF.' }
+        $pageLine = @($pdfInfo | Where-Object { "$_" -match '^Pages:\s*(\d+)\s*$' } | Select-Object -First 1)
+        if (-not $pageLine -or $pageLine[0] -notmatch '^Pages:\s*(\d+)\s*$') { throw 'pdfinfo did not report the page count.' }
+        $pdfPages = [int]$Matches[1]
+        if ($pdfPages -ne 279) { throw "Unexpected large PDF page count: $pdfPages" }
+        $primaryPdfMetadata = [ordered]@{
+            filename = [System.IO.Path]::GetFileName($resolvedPdfPath)
+            size_bytes = $pdfFile.Length
+            page_count = $pdfPages
+            sha256 = $pdfSha256
+        }
+        $primaryPdfMetadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runPath 'pdf-preflight.json') -Encoding utf8
+        $env:PRIMARY_EXPECTED_PAGE_COUNT = '279'
+        $env:PRIMARY_EXPECTED_TEXT = ''
+    } else {
+        $env:PRIMARY_EXPECTED_PAGE_COUNT = '1'
+        $env:PRIMARY_EXPECTED_TEXT = 'ISOLATED PDF API EXTRACTION PROOF'
+    }
     $loadCheck = if ($SkipLoad) { 'skipped' } else { 'run' }
     $metadata = [ordered]@{
         project = $project
@@ -132,6 +163,7 @@ try {
         documentsRepoPath = $documentsRoot.Replace('\', '/')
         documentsRemote = $documentsRemote
         documentsHead = $documentsHead
+        primaryPdf = $primaryPdfMetadata
         apiImage = "pdf-api-real:$runId"
         extractorImage = "pdf-extractor-real:$runId"
         documentsImage = "pdf-documents-real:$runId"
@@ -166,8 +198,20 @@ try {
     $fixtureOutput | Set-Content -LiteralPath (Join-Path $runPath 'fixture-generation.json') -Encoding utf8
     $fixtureOutput | ForEach-Object { Write-Host $_ }
     if ($fixtureExitCode -ne 0) { throw "Fixture generation failed with exit code $fixtureExitCode" }
+    if ($PdfPath) {
+        $copiedProofPath = Join-Path $runPath 'proof.pdf'
+        Copy-Item -LiteralPath $resolvedPdfPath -Destination $copiedProofPath -Force
+    }
     Invoke-LoggedDocker -Arguments ($composeBase + @('up', '--build', '--detach', '--wait', '--wait-timeout', '240')) -LogPath (Join-Path $runPath 'up.log')
-    Invoke-LoggedDocker -Arguments @('image', 'inspect', $metadata.apiImage, '--format', '{{.Id}} {{.Created}}') -LogPath (Join-Path $runPath 'api-image-inspect.txt')
+    foreach ($image in @(
+        @{ name = 'api'; tag = $metadata.apiImage },
+        @{ name = 'extractor'; tag = $metadata.extractorImage },
+        @{ name = 'documents'; tag = $metadata.documentsImage },
+        @{ name = 'mongodb'; tag = 'mongo:7.0.45' },
+        @{ name = 'traefik'; tag = 'traefik:v3.6.25' }
+    )) {
+        Invoke-LoggedDocker -Arguments @('image', 'inspect', $image.tag, '--format', '{{.Id}} {{.Created}}') -LogPath (Join-Path $runPath "$($image.name)-image-inspect.txt")
+    }
     Invoke-LoggedDocker -Arguments ($composeBase + @('ps')) -LogPath (Join-Path $runPath 'ps-after-up.txt')
 
     Invoke-LoggedDocker -Arguments (@('compose', '--profile', 'client', '-p', $project, '--project-directory', $PSScriptRoot, '-f', $composePath, 'run', '--rm', '-T', 'client')) -LogPath (Join-Path $runPath 'functional-check.json')
@@ -208,6 +252,9 @@ catch {
 finally {
     if ($RunIntegration -and $projectStarted) {
         try { Invoke-LoggedDocker -Arguments ($composeBase + @('down')) -LogPath (Join-Path $runPath 'cleanup.log') } catch { Write-Warning "Compose cleanup failed: $_" }
+    }
+    if ($copiedProofPath -and (Test-Path -LiteralPath $copiedProofPath)) {
+        Remove-Item -LiteralPath $copiedProofPath -Force
     }
     foreach ($name in $environmentNames) {
         [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process')

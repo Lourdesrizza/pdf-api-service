@@ -155,6 +155,9 @@ services:
     image: ${API_IMAGE:?Set a unique test image tag}
     profiles: [client]
     entrypoint: ["python", "/tmp/verify.py"]
+    environment:
+      PRIMARY_EXPECTED_PAGE_COUNT: ${PRIMARY_EXPECTED_PAGE_COUNT:-1}
+      PRIMARY_EXPECTED_TEXT: ${PRIMARY_EXPECTED_TEXT-ISOLATED PDF API EXTRACTION PROOF}
     volumes:
       - ./verify.py:/tmp/verify.py:ro
       - ./persistence_check.py:/tmp/persistence_check.py:ro

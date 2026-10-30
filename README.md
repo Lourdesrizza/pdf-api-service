@@ -107,7 +107,7 @@ docker compose -f docker-compose.test.yml down
 
 ## Integración real en un entorno dedicado
 
-La integración API → Extractor real → Documents real → MongoDB 7 se ejecutó el 29/10/2026. El resultado resumido está en [`integration/real-stack/results/2026-10-29-summary.json`](integration/real-stack/results/2026-10-29-summary.json). El Compose y los probes reproducibles están en [`integration/real-stack/README.md`](integration/real-stack/README.md); no dependen de la carpeta externa de logs. No se versionan PDFs: el generador crea dos fixtures sintéticos pequeños en una carpeta ignorada. No son los PDFs oficiales de carga.
+La integración API → Extractor real → Documents real → MongoDB 7 se ejecutó el 29/10/2026. El resultado resumido está en [`integration/real-stack/results/2026-10-29-summary.json`](integration/real-stack/results/2026-10-29-summary.json). El 30/10/2026 se aceptó además el PDF original de 279 páginas; su evidencia está en [`integration/real-stack/results/2026-10-30-pdf279-summary.json`](integration/real-stack/results/2026-10-30-pdf279-summary.json). El Compose y los probes reproducibles están en [`integration/real-stack/README.md`](integration/real-stack/README.md); no dependen de la carpeta externa de logs. No se versionan PDFs: el generador crea dos fixtures sintéticos pequeños en una carpeta ignorada. No son los PDFs oficiales de carga.
 
 El stack de prueba usa su propia red interna, un servicio por réplica, caché del Extractor desactivada, métricas habilitadas y cliente interno. No publica puertos, no se conecta a `pdf-network` y no contiene Redis. Traefik es una instancia exclusiva con proveedor de archivo, sin dashboard ni socket Docker. La prueba confirmó esa ruta aislada; no valida el DNS, TLS ni el Traefik compartido.
 

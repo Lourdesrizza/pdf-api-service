@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "run_id": "20261030132044-146e04a7",
+  "run_started_at_utc": "2026-10-30T13:20:44Z",
+  "result": "passed",
+  "scope": "isolated API -> real Extractor -> real Documents -> MongoDB 7; exclusive internal Traefik",
+  "pdf_preflight": {
+    "filename": "pdf279hojas.pdf",
+    "size_bytes": 17749468,
+    "page_count": 279,
+    "sha256": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+    "verification": "size, pdfinfo page count and SHA-256 matched before starting the stack; source file remained unchanged"
+  },
+  "extracted_content": {
+    "characters": 427008,
+    "sha256": "c636e1997422a5a99c45dc6ff9f2d2228f062d1e432b2948b373aa4328c1cdbc",
+    "first_page_heading_present": true,
+    "last_page_heading_present": true
+  },
+  "versions": {
+    "api": {
+      "remote": "https://github.com/Lourdesrizza/pdf-api-service.git",
+      "commit": "3d3308e51ae6337ba25be7a82bb55e0fe859a849",
+      "working_tree_changes": [
+        "integration/real-stack/compose.yaml",
+        "integration/real-stack/persistence_check.py",
+        "integration/real-stack/run.ps1",
+        "integration/real-stack/verify.py"
+      ],
+      "production_app_changed": false
+    },
+    "extractor": {
+      "remote": "https://github.com/MaitePuente/pdf-extractor-service.git",
+      "commit": "5f0de842ee1bcdcd23ce1383427f6b757d8882fa",
+      "working_tree_clean": true
+    },
+    "documents": {
+      "remote": "https://github.com/angelina-magallanes/pdf-document-service.git",
+      "commit": "8e1214d0ec82df3806c096840e3dea12defe69d5",
+      "working_tree_clean": true
+    },
+    "mongodb": "7.0.45",
+    "traefik": "3.6.25"
+  },
+  "images": {
+    "api": {
+      "tag": "pdf-api-real:20261030132044-146e04a7",
+      "id": "sha256:eefcd9ad4103092019ead7309cd04125794e585820084a98cc84618a5a8eb5a5"
+    },
+    "extractor": {
+      "tag": "pdf-extractor-real:20261030132044-146e04a7",
+      "id": "sha256:a4097885044c3e58757d29357ad705fc7db349a426db459343e67323134538f7"
+    },
+    "documents": {
+      "tag": "pdf-documents-real:20261030132044-146e04a7",
+      "id": "sha256:2d166b8a68fc1dabc9455083cd1c959da443718b243f29de90b2b09e852478b0"
+    },
+    "mongodb": {
+      "tag": "mongo:7.0.45",
+      "id": "sha256:8bb4442761a63a8dda452744082cdac9644b429807eb977b42324a63cef59ca4"
+    },
+    "traefik": {
+      "tag": "traefik:v3.6.25",
+      "id": "sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d"
+    }
+  },
+  "configuration": {
+    "unique_compose_project": "pdf-api-real-20261030132044-146e04a7",
+    "network": "pdf-api-real-20261030132044-146e04a7_isolated (internal)",
+    "replicas": 1,
+    "redis": false,
+    "extractor_cache_enabled": false,
+    "extractor_metrics_enabled": true,
+    "api_max_upload_bytes": 20971520,
+    "api_extractor_timeout_seconds": 30,
+    "api_documents_timeout_seconds": 5,
+    "api_ready_check_timeout_seconds": 2,
+    "load_check": "skipped",
+    "timeouts_changed": false
+  },
+  "checks": {
+    "health": { "status": 200 },
+    "ready": {
+      "status": 200,
+      "dependencies": { "extractor": "ok", "documents": "ok" }
+    },
+    "primary_flow": {
+      "first_binary": {
+        "status": 200,
+        "source": "extracted",
+        "document_id": "6ae499efc2231a43fd559f4d",
+        "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+        "page_count": 279,
+        "duration_ms": 8475.11
+      },
+      "second_binary": {
+        "status": 200,
+        "source": "existing",
+        "document_id": "6ae499efc2231a43fd559f4d",
+        "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+        "page_count": 279,
+        "duration_ms": 191.637
+      },
+      "multipart": {
+        "status": 200,
+        "source": "existing",
+        "document_id": "6ae499efc2231a43fd559f4d",
+        "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+        "page_count": 279,
+        "duration_ms": 2113.046
+      },
+      "extractor_http_post_extract_total": {
+        "before_first": 0,
+        "after_first": 1,
+        "after_second": 1,
+        "after_multipart": 1
+      },
+      "content_sha256_identical_for_all_responses": true
+    },
+    "persistence_after_documents_restart": {
+      "status": 200,
+      "source": "existing",
+      "document_id": "6ae499efc2231a43fd559f4d",
+      "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+      "page_count": 279,
+      "content_sha256": "c636e1997422a5a99c45dc6ff9f2d2228f062d1e432b2948b373aa4328c1cdbc",
+      "extractor_http_post_extract_total": { "before": 4, "after": 4 }
+    },
+    "exclusive_traefik": {
+      "health_status": 200,
+      "ready_status": 200,
+      "existing_document_status": 200
+    },
+    "mongo": {
+      "version": "7.0.45",
+      "records_after_verification": 2,
+      "unique_checksum_index": true
+    },
+    "other_contract_checks": {
+      "signature_invalid": {
+        "status": 400,
+        "extract_post_total": { "before": 1, "after": 1 }
+      },
+      "malformed_pdf": {
+        "status": 422,
+        "extract_post_total": { "before": 1, "after": 2 }
+      },
+      "traefik_existing_document": {
+        "status": 200,
+        "extract_post_total": { "before": 2, "after": 2 }
+      },
+      "concurrent_coverage_requests": {
+        "requests": 2,
+        "extract_post_total": { "before": 2, "after": 4 },
+        "load_test": false
+      },
+      "readiness_when_dependency_stopped": 503,
+      "process_when_dependency_stopped": 502
+    }
+  },
+  "cleanup": {
+    "compose_down_succeeded": true,
+    "containers_remaining_for_project": false,
+    "network_remaining_for_project": false,
+    "temporary_pdf_copy_removed": true,
+    "run_specific_application_image_tags_removed_after_recording_ids": true,
+    "preexisting_mongodb_and_traefik_images_untouched": true,
+    "source_pdf_added_to_git": false
+  },
+  "evidence_directory": "integration/real-stack/run/20261030132044-146e04a7"
+}
