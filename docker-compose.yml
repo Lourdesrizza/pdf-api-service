@@ -1,6 +1,8 @@
 services:
   api:
     build: .
+    init: true
+    stop_grace_period: 30s
     env_file:
       - path: .env
         required: false
@@ -12,7 +14,8 @@ services:
       EXTRACTOR_TIMEOUT_SECONDS: ${EXTRACTOR_TIMEOUT_SECONDS:-30}
       DOCUMENT_TIMEOUT_SECONDS: ${DOCUMENT_TIMEOUT_SECONDS:-5}
       READY_CHECK_TIMEOUT_SECONDS: ${READY_CHECK_TIMEOUT_SECONDS:-2}
-      MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-0}
+      BODY_TIMEOUT_SECONDS: ${BODY_TIMEOUT_SECONDS:-30}
+      MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-2}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     networks:
       - pdf-network
@@ -24,9 +27,11 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.pdf-api.rule=Host(`${TRAEFIK_API_HOST:-api.universidad.localhost}`)
-      - traefik.http.routers.pdf-api.entrypoints=websecure
-      - traefik.http.routers.pdf-api.tls=true
-      - traefik.http.services.pdf-api.loadbalancer.server.port=8000
+      - traefik.docker.network=pdf-network
+      - traefik.http.routers.pdf-api.entrypoints=${TRAEFIK_ENTRYPOINT:-web}
+      - traefik.http.routers.pdf-api.tls=${TRAEFIK_TLS:-false}
+      - traefik.http.routers.pdf-api.service=pdf-api
+      - traefik.http.services.pdf-api.loadbalancer.server.port=${PORT:-8000}
 
 networks:
   pdf-network:

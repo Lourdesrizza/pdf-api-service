@@ -5,10 +5,19 @@ name: pdf-api-test
 services:
   api:
     build: .
+    init: true
+    stop_grace_period: 30s
     environment:
       EXTRACTOR_URL: http://fake-extractor:8000
       DOCUMENT_SERVICE_URL: http://fake-documents:8000
       MAX_UPLOAD_BYTES: "20971520"
+      BODY_TIMEOUT_SECONDS: "30"
+      MAX_CONCURRENT_REQUESTS: "2"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     ports:
       - "127.0.0.1:8002:8000"
     depends_on:

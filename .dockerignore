@@ -5,6 +5,8 @@
 __pycache__
 .env
 .git
+.audit-baseline
+integration/real-stack/run
 tests
 docs
 scripts

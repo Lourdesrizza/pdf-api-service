@@ -13,7 +13,7 @@ def correlation_headers() -> dict[str, str]:
     return {"X-Request-ID": request_id_context.get()}
 
 
-def map_transport_error(exc: httpx.TransportError, service: str) -> APIError:
+def map_transport_error(exc: httpx.RequestError, service: str) -> APIError:
     logger.error(
         "Upstream transport failure service=%s type=%s request_id=%s",
         service,

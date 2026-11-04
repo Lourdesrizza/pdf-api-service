@@ -21,7 +21,7 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    logger.error("Request validation failed request_id=%s errors=%r", getattr(request.state, "request_id", "unknown"), exc.errors())
+    logger.error("Request validation failed request_id=%s count=%s", getattr(request.state, "request_id", "unknown"), len(exc.errors()))
     return JSONResponse(status_code=422, content={"error": "validation_error", "detail": "La petición no cumple el formato esperado."})
 
 
@@ -31,8 +31,9 @@ async def http_error_handler(request: Request, exc: StarletteHTTPException) -> J
 
 
 async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unexpected application failure request_id=%s", getattr(request.state, "request_id", "unknown"))
-    return JSONResponse(status_code=500, content={"error": "internal_error", "detail": "Ocurrió un error interno."})
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.error("Unexpected application failure request_id=%s type=%s", request_id, type(exc).__name__)
+    return JSONResponse(status_code=500, content={"error": "internal_error", "detail": "Ocurrió un error interno."}, headers={"X-Request-ID": request_id})
 
 
 def install_handlers(app: FastAPI) -> None:

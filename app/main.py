@@ -46,7 +46,7 @@ PROCESS_OPENAPI_EXTRA = {
 }
 PROCESS_ERROR_RESPONSES = {
     status: {"model": ErrorResponse}
-    for status in (400, 413, 415, 422, 500, 502, 503, 504)
+    for status in (400, 408, 413, 415, 422, 500, 502, 503, 504)
 }
 
 
@@ -97,9 +97,10 @@ async def request_context(request: Request, call_next):
     token = request_id_context.set(request_id)
     try:
         response = await call_next(request)
-    except Exception:
-        logger.exception("Unhandled request failure request_id=%s", request_id)
-        raise
+    except Exception as exc:
+        from app.errors import unexpected_error_handler
+
+        response = await unexpected_error_handler(request, exc)
     finally:
         request_id_context.reset(token)
     response.headers["X-Request-ID"] = request_id
@@ -153,7 +154,9 @@ async def process(request: Request):
             request.app.state.active_requests += 1
 
     try:
-        pdf, filename = await receive_pdf(request, settings.max_upload_bytes)
+        pdf, filename = await receive_pdf(
+            request, settings.max_upload_bytes, settings.body_timeout_seconds
+        )
         return await request.app.state.orchestrator.process(pdf, filename)
     finally:
         if limit > 0:

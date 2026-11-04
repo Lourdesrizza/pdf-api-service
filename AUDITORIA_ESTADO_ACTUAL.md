@@ -1,5 +1,22 @@
 # Auditoría del estado actual de pdf-api-service
 
+## Estado vigente — cierre verificado 04/11/2026
+
+Esta sección prevalece sobre todo el historial que sigue. Informe completo: [docs/cierre-2026-11-04.md](docs/cierre-2026-11-04.md); evidencia resumida: [integration/real-stack/results/2026-11-04-summary.json](integration/real-stack/results/2026-11-04-summary.json).
+
+- Inicio: main, HEAD c9a4b03b9ed5e101c89ab4159fcb6aabfa2cfd37, árbol limpio. Suite original 73 passed/1 skipped; final **131 passed/1 skipped**, un warning preexistente. Sin commit, push, merge ni cambios en repositorios ajenos.
+- Corregidos configuración Pydantic, HTTP/Traefik/PORT, apagado 30/20 s, Content-Length, deadline de cuerpo y 408, multipart estricto, nombres, estados de éxito upstream, decodificación, privacidad de logs y X-Request-ID en 500. Sin nuevas dependencias ni cambios de lock.
+- Aceptación real exclusiva final: proyecto pdf-api-real-20261104153839-bc487a05; API desde árbol local final (hashes app verificados contra imagen), Extractor 5f0de84, Documents remoto actual 2e6a806 por snapshot dentro de API, Mongo 7.0.45 y Traefik 3.6.25. No se modificó el checkout de Documents 8e1214d.
+- Original 279 páginas/hash 728c8a…713162 reutilizado y verificado. Nuevo extracted, repetido/multipart existing, mismo ID/checksum; contador extractor 0→1→1→1. Persistencia, carrera de duplicados, errores al detener dependencias y ruta por Traefik exclusivo aprobados.
+- 1 CPU/512 MiB, admisión 2: pico cgroup 255,13 MiB. Carga C2: dos variantes nuevas 200 extracted y 26 repetidos existing sin errores; p50 272,93 ms, p95 601,16 ms. Una corrida exploratoria previa observó 503 con Extractor MAX_IN_FLIGHT=1; no se garantiza aceptación simultánea ni extracción única.
+- SIGTERM durante recepción: petición completó 200 existing, cierre de servidor confirmado en 3,692 s, **salida real 143**. PORT=8123 también verificado. No se agregó readiness de drenado ni señales propias.
+- Documents 413 real por Markdown de 17 MiB confirmado; API mantiene traducción pública 502, documentada y con regresión.
+- uv lock --check, git diff --check, Compose base/base+dev/test/real y sintaxis Python/PowerShell aprobados. Los tres proyectos propios quedaron sin contenedores/red; imágenes y evidencia se conservaron. PDF original no agregado a Git.
+- API lista para integrar con los commits probados. Pendiente externo: aceptación del entorno compartido/versiones/DNS/HTTP con base descartable coordinada, dataset y benchmark oficial del Extractor. Esta prueba no acredita TLS, cinco réplicas ni finalización del sistema grupal. Mensajes propuestos y guion oral en el informe de cierre; no se enviaron mensajes.
+
+## Historial conservado — antecedentes, no lista vigente de pendientes
+
+
 
 ## Estado actualizado — integración real completada (29/10/2026)
 

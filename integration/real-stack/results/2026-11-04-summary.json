@@ -1,0 +1,494 @@
+{
+  "date": "2026-11-04",
+  "timezone": "America/Buenos_Aires",
+  "source": {
+    "project": "pdf-api-real-20261104153839-bc487a05",
+    "runDirectory": "C:/dev/pdf-proyecto/pdf-api-service/integration/real-stack/run/20261104153839-bc487a05",
+    "apiLoadCheck": "run",
+    "runId": "20261104153839-bc487a05",
+    "apiRepoPath": "C:/dev/pdf-proyecto/pdf-api-service",
+    "apiRemote": "https://github.com/Lourdesrizza/pdf-api-service.git",
+    "apiHead": "c9a4b03b9ed5e101c89ab4159fcb6aabfa2cfd37",
+    "apiWorkingTreeStatus": [
+      " M .dockerignore",
+      " M .env.example",
+      " M .gitignore",
+      " M Dockerfile",
+      " M README.md",
+      " M app/clients/base.py",
+      " M app/clients/documents.py",
+      " M app/clients/extractor.py",
+      " M app/config.py",
+      " M app/errors.py",
+      " M app/main.py",
+      " M app/validation.py",
+      " M docker-compose.dev.yml",
+      " M docker-compose.yml",
+      " M docs/contracts.md",
+      " M integration/real-stack/compose.yaml",
+      " M integration/real-stack/run.ps1",
+      "?? integration/real-stack/runtime_host.py",
+      "?? integration/real-stack/runtime_probe.py",
+      "?? tests/test_boundary_hardening.py"
+    ],
+    "extractorRepoPath": "C:/dev/pdf-proyecto/pdf-extractor-service-review",
+    "extractorRemote": "https://github.com/MaitePuente/pdf-extractor-service.git",
+    "extractorHead": "5f0de842ee1bcdcd23ce1383427f6b757d8882fa",
+    "documentsRepoPath": "C:/dev/pdf-proyecto/pdf-api-service/integration/real-stack/run/20261104153839-bc487a05/source/pdf-document-service-2e6a806b94459be5ca788bb278dc6dc03f139388",
+    "documentsRemote": "https://github.com/angelina-magallanes/pdf-document-service.git",
+    "documentsHead": "2e6a806b94459be5ca788bb278dc6dc03f139388",
+    "primaryPdf": {
+      "filename": "pdf279hojas.pdf",
+      "size_bytes": 17749468,
+      "page_count": 279,
+      "sha256": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162"
+    },
+    "apiImage": "pdf-api-real:20261104153839-bc487a05",
+    "extractorImage": "pdf-extractor-real:20261104153839-bc487a05",
+    "documentsImage": "pdf-documents-real:20261104153839-bc487a05",
+    "mongoDatabase": "pdf_api_20261104153839_bc487a05",
+    "documentsSource": "GitHub pinned source archive, downloaded inside API repository",
+    "documentsArchiveSha256": "1146a50c2584acd704c3f767f84d48917562fb672d529edfdeb810bb54301e8f"
+  },
+  "images": {
+    "api": "sha256:e0e7e986f19d60c2a4c80d8934abad474cdced604bbbfeb22e487a92b6655c03 2026-11-04T15:38:49.130959168Z",
+    "extractor": "sha256:ca29c742bee37cef7730477ff51d20ff1f108e708743c3fafa6045a4f4d017f4 2026-11-04T15:31:55.868767017Z",
+    "documents": "sha256:10b29cd1beaac1c9de93b0c4163baf1cc09a4e559d56c0d053d371950334d079 2026-11-04T15:35:42.02114558Z",
+    "mongodb": "sha256:8bb4442761a63a8dda452744082cdac9644b429807eb977b42324a63cef59ca4 2026-10-26T23:26:05.462883861Z",
+    "traefik": "sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d 2026-07-31T21:02:58.889730321Z"
+  },
+  "initial_suite": {
+    "passed": 73,
+    "skipped": 1,
+    "warnings": 1,
+    "method": "copy of git archive HEAD inside .audit-baseline, existing locked venv"
+  },
+  "final_suite": {
+    "passed": 131,
+    "skipped": 1,
+    "warnings": 1,
+    "seconds": 22.89
+  },
+  "checks": {
+    "uv_lock_check": "passed, 33 packages",
+    "git_diff_check": "passed",
+    "compose": [
+      "base",
+      "base+dev",
+      "test",
+      "isolated",
+      "PORT=8123 base+dev consistent"
+    ],
+    "syntax": "Python and PowerShell passed"
+  },
+  "functional": {
+    "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+    "concurrency_checksum": "f6146dcab7423359fd75a6ccea37a5f88aec8b4ac0d3fc24eb858a779f8f7e16",
+    "health": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "service": "api"
+      }
+    },
+    "ready": {
+      "status": 200,
+      "body": {
+        "status": "ready",
+        "dependencies": {
+          "extractor": "ok",
+          "documents": "ok"
+        }
+      }
+    },
+    "primary_flow": {
+      "first": {
+        "status": 200,
+        "duration_ms": 5630.586,
+        "document": {
+          "document_id": "6aeb51b25598d0c57283ce02",
+          "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+          "page_count": 279,
+          "source": "extracted",
+          "content_characters": 427008,
+          "content_sha256": "c636e1997422a5a99c45dc6ff9f2d2228f062d1e432b2948b373aa4328c1cdbc",
+          "has_first_page_heading": true,
+          "has_last_page_heading": true
+        }
+      },
+      "second": {
+        "status": 200,
+        "duration_ms": 129.178,
+        "document": {
+          "document_id": "6aeb51b25598d0c57283ce02",
+          "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+          "page_count": 279,
+          "source": "existing",
+          "content_characters": 427008,
+          "content_sha256": "c636e1997422a5a99c45dc6ff9f2d2228f062d1e432b2948b373aa4328c1cdbc",
+          "has_first_page_heading": true,
+          "has_last_page_heading": true
+        }
+      },
+      "multipart": {
+        "status": 200,
+        "duration_ms": 1309.277,
+        "document": {
+          "document_id": "6aeb51b25598d0c57283ce02",
+          "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+          "page_count": 279,
+          "source": "existing",
+          "content_characters": 427008,
+          "content_sha256": "c636e1997422a5a99c45dc6ff9f2d2228f062d1e432b2948b373aa4328c1cdbc",
+          "has_first_page_heading": true,
+          "has_last_page_heading": true
+        }
+      },
+      "extract_post_total": {
+        "before": 0,
+        "after_first": 1,
+        "after_second": 1,
+        "after_multipart": 1
+      }
+    },
+    "invalid_inputs": {
+      "invalid_signature": {
+        "status": 400,
+        "body": {
+          "error": "invalid_pdf",
+          "detail": "El archivo no tiene una firma PDF válida."
+        },
+        "extract_post_total": 1,
+        "layer": "API validation; extractor counter unchanged"
+      },
+      "malformed_pdf": {
+        "status": 422,
+        "body": {
+          "error": "pdf_rejected",
+          "detail": "El extractor rechazó el PDF."
+        },
+        "extract_post_total": 2,
+        "layer": "extractor rejection translated to API 422"
+      }
+    },
+    "exclusive_traefik": {
+      "health": {
+        "status": 200,
+        "body": {
+          "status": "ok",
+          "service": "api"
+        }
+      },
+      "ready": {
+        "status": 200,
+        "body": {
+          "status": "ready",
+          "dependencies": {
+            "extractor": "ok",
+            "documents": "ok"
+          }
+        }
+      },
+      "process": {
+        "status": 200,
+        "document": {
+          "document_id": "6aeb51b25598d0c57283ce02",
+          "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+          "page_count": 279,
+          "source": "existing",
+          "content_characters": 427008,
+          "content_sha256": "c636e1997422a5a99c45dc6ff9f2d2228f062d1e432b2948b373aa4328c1cdbc",
+          "has_first_page_heading": true,
+          "has_last_page_heading": true
+        }
+      },
+      "extract_post_total": {
+        "before": 2,
+        "after": 2
+      },
+      "scope": "internal Compose network; file provider; no Docker socket, dashboard or published ports"
+    },
+    "concurrent_same_pdf": {
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "document_id": "6aeb51b55598d0c57283ce03",
+            "checksum": "f6146dcab7423359fd75a6ccea37a5f88aec8b4ac0d3fc24eb858a779f8f7e16",
+            "page_count": 1,
+            "source": "extracted"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "document_id": "6aeb51b55598d0c57283ce03",
+            "checksum": "f6146dcab7423359fd75a6ccea37a5f88aec8b4ac0d3fc24eb858a779f8f7e16",
+            "page_count": 1,
+            "source": "existing"
+          }
+        }
+      ],
+      "extract_post_total": {
+        "before": 2,
+        "after": 4
+      },
+      "extraction_count_assertion": "no single-extraction race requirement; Documents uniqueness and consistent result are required"
+    },
+    "direct_counts": {
+      "documents_checksum_reads": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+      "extract_post_total_final": 4,
+      "invalid_api_signature_did_not_increment": true,
+      "extractor_rejection_incremented": true
+    }
+  },
+  "persistence": {
+    "ready": {
+      "status": "ready",
+      "dependencies": {
+        "extractor": "ok",
+        "documents": "ok"
+      }
+    },
+    "after_documents_restart": {
+      "status": 200,
+      "document_id": "6aeb51b25598d0c57283ce02",
+      "checksum": "728c8a522ce24bf0ba3851cd109cdc0e55b200e3cd9b55b8343b39c005713162",
+      "page_count": 279,
+      "source": "existing",
+      "content_characters": 427008,
+      "content_sha256": "c636e1997422a5a99c45dc6ff9f2d2228f062d1e432b2948b373aa4328c1cdbc"
+    },
+    "extract_post_total": {
+      "before": 4,
+      "after": 4
+    }
+  },
+  "repeated_load_c1": {
+    "requests": 24,
+    "errors": 0,
+    "elapsed_seconds": 5.170146894000936,
+    "requests_per_second": 4.642034451254733,
+    "p50_seconds": 0.0975102890006383,
+    "p95_seconds": 0.1257094380016497,
+    "sources": {
+      "existing": 24,
+      "extracted": 0
+    },
+    "scenario": "same PDF, mostly deduplicated; not new-PDF extraction throughput"
+  },
+  "runtime": {
+    "project": "pdf-api-real-20261104153839-bc487a05",
+    "api_image_id": "sha256:e0e7e986f19d60c2a4c80d8934abad474cdced604bbbfeb22e487a92b6655c03",
+    "cpu_limit": 1,
+    "memory_limit_bytes": 536870912,
+    "load": {
+      "concurrency": 2,
+      "pdf_bytes": 17749468,
+      "new": [
+        {
+          "ms": 1174.53,
+          "source": "extracted",
+          "status": 200,
+          "error": null,
+          "retry_after": null
+        },
+        {
+          "ms": 1839.61,
+          "source": "extracted",
+          "status": 200,
+          "error": null,
+          "retry_after": null
+        }
+      ],
+      "documents_oversized_status": 413,
+      "repeated": {
+        "requests": 26,
+        "errors": 0,
+        "sources": [
+          "existing"
+        ],
+        "p50_ms": 272.93,
+        "p95_ms": 601.16
+      }
+    },
+    "memory_peak_bytes_before_shutdown": 267526144,
+    "app_source_sha256": {
+      "app/schemas.py": "97df782275b91d3910b49719f94a23a4cb9f87689000fa670454e41908ddb473",
+      "app/config.py": "884a0c3213f5048b42bc255797f636679c7ea947d4013f874c8d37038af403d5",
+      "app/checksum.py": "58e7f14db7a48de89243e523fd348e0e5d8fb6077f01ff65b71818e3d6fd7425",
+      "app/__init__.py": "6e88bd292f449e3c23917fe73e4e4a2a98f86a003df7959d94ab5a671a61d29a",
+      "app/main.py": "de6b46af29010fb0377a761726236004b57920133c02cbe0a15bb922bb684401",
+      "app/validation.py": "335f667da5ce30a0be1410fee76dd60140a97736312d30906372ad4e47c574fe",
+      "app/errors.py": "fb985174653f3957310212988088d1a895dacaf07bff98e45207b33ce3834348",
+      "app/services/__init__.py": "ba9a6b7d97164bdb9877eea9af7857923784c555ef8f8c0b1a82d3bfbfddfd29",
+      "app/services/orchestrator.py": "7c2bde5aa069137d3f5fd730d6695555b45ec9069e53cc3e9ec0e0e4d007157d",
+      "app/clients/base.py": "34c96fac85a2d275c559fa71f1cc128b0bff03c78223b351dc63b972de9285b7",
+      "app/clients/__init__.py": "66b17245b990ea786389ddbfc0c24531a3a487430b61c93d859570de9968b5b1",
+      "app/clients/documents.py": "3f5be8e824290bcf2efc1c7affa3627c26e4b4aad6ac5b959846e810057edf3f",
+      "app/clients/extractor.py": "7121799b2b92e237cdf4ea80f7c4ff46270d26f54a1cee013f44c4b8588a6a68"
+    },
+    "docker_stats_samples": [
+      {
+        "BlockIO": "2.56MB / 0B",
+        "CPUPerc": "0.18%",
+        "Container": "4d2d78e620d7c56e869d9f0094aaf0d053368b60773b1798261e3b3ee96f6de8",
+        "ID": "4d2d78e620d7",
+        "MemPerc": "19.78%",
+        "MemUsage": "101.3MiB / 512MiB",
+        "Name": "pdf-api-real-20261104153839-bc487a05-api-1",
+        "NetIO": "529MB / 31.6MB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "2.56MB / 0B",
+        "CPUPerc": "5.83%",
+        "Container": "4d2d78e620d7c56e869d9f0094aaf0d053368b60773b1798261e3b3ee96f6de8",
+        "ID": "4d2d78e620d7",
+        "MemPerc": "23.10%",
+        "MemUsage": "118.3MiB / 512MiB",
+        "Name": "pdf-api-real-20261104153839-bc487a05-api-1",
+        "NetIO": "566MB / 68.1MB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "2.56MB / 0B",
+        "CPUPerc": "95.78%",
+        "Container": "4d2d78e620d7c56e869d9f0094aaf0d053368b60773b1798261e3b3ee96f6de8",
+        "ID": "4d2d78e620d7",
+        "MemPerc": "23.29%",
+        "MemUsage": "119.2MiB / 512MiB",
+        "Name": "pdf-api-real-20261104153839-bc487a05-api-1",
+        "NetIO": "676MB / 71.3MB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "2.77MB / 0B",
+        "CPUPerc": "77.00%",
+        "Container": "4d2d78e620d7c56e869d9f0094aaf0d053368b60773b1798261e3b3ee96f6de8",
+        "ID": "4d2d78e620d7",
+        "MemPerc": "26.27%",
+        "MemUsage": "134.5MiB / 512MiB",
+        "Name": "pdf-api-real-20261104153839-bc487a05-api-1",
+        "NetIO": "857MB / 75.5MB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "2.77MB / 0B",
+        "CPUPerc": "51.97%",
+        "Container": "4d2d78e620d7c56e869d9f0094aaf0d053368b60773b1798261e3b3ee96f6de8",
+        "ID": "4d2d78e620d7",
+        "MemPerc": "16.56%",
+        "MemUsage": "84.8MiB / 512MiB",
+        "Name": "pdf-api-real-20261104153839-bc487a05-api-1",
+        "NetIO": "1.04GB / 81MB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "3.52MB / 0B",
+        "CPUPerc": "19.92%",
+        "Container": "4d2d78e620d7c56e869d9f0094aaf0d053368b60773b1798261e3b3ee96f6de8",
+        "ID": "4d2d78e620d7",
+        "MemPerc": "16.66%",
+        "MemUsage": "85.32MiB / 512MiB",
+        "Name": "pdf-api-real-20261104153839-bc487a05-api-1",
+        "NetIO": "1.04GB / 81MB",
+        "PIDs": "6"
+      }
+    ],
+    "sigterm_inflight": {
+      "exit_code": 143,
+      "elapsed_seconds": 3.692,
+      "response": {
+        "status": 200,
+        "source": "existing"
+      },
+      "application_shutdown_complete": true
+    }
+  },
+  "port": {
+    "container": "pdf-api-real-20261104153839-bc487a05-portproof",
+    "port": 8123,
+    "health_status": 200,
+    "exit_code": 143,
+    "oom_killed": false,
+    "image_id": "sha256:e0e7e986f19d60c2a4c80d8934abad474cdced604bbbfeb22e487a92b6655c03"
+  },
+  "dependencies": {
+    "extractor-down": {
+      "mode": "extractor-down",
+      "ready": {
+        "status": 503,
+        "body": {
+          "error": "not_ready",
+          "detail": "Uno o más servicios requeridos no están disponibles.",
+          "dependencies": {
+            "extractor": "unavailable",
+            "documents": "ok"
+          }
+        }
+      },
+      "process": {
+        "status": 502,
+        "body": {
+          "error": "upstream_unavailable",
+          "detail": "El servicio extractor no está disponible."
+        }
+      }
+    },
+    "documents-down": {
+      "mode": "documents-down",
+      "ready": {
+        "status": 503,
+        "body": {
+          "error": "not_ready",
+          "detail": "Uno o más servicios requeridos no están disponibles.",
+          "dependencies": {
+            "extractor": "ok",
+            "documents": "unavailable"
+          }
+        }
+      },
+      "process": {
+        "status": 502,
+        "body": {
+          "error": "upstream_unavailable",
+          "detail": "El servicio document service no está disponible."
+        }
+      }
+    }
+  },
+  "cleanup": {
+    "pdf-api-real-20261104153044-786a936e": {
+      "remaining_containers": 0,
+      "remaining_networks": 0
+    },
+    "pdf-api-real-20261104153500-1d4cd276": {
+      "remaining_containers": 0,
+      "remaining_networks": 0
+    },
+    "pdf-api-real-20261104153839-bc487a05": {
+      "remaining_containers": 0,
+      "remaining_networks": 0
+    }
+  },
+  "exploratory_runs": [
+    {
+      "project": "pdf-api-real-20261104153044-786a936e",
+      "documents_commit": "8e1214d0ec82df3806c096840e3dea12defe69d5",
+      "result": "functional, persistence, proxy, dependency failure checks and repeated load passed; prior app transport handler version"
+    },
+    {
+      "project": "pdf-api-real-20261104153500-1d4cd276",
+      "documents_commit": "2e6a806b94459be5ca788bb278dc6dc03f139388",
+      "result": "functional/persistence and C1 load passed; first C2 probe expected all 200 but received upstream 503 (MAX_IN_FLIGHT=1); probe corrected to record saturation without retry; cleanup passed"
+    }
+  ],
+  "limitations": [
+    "One API replica and exclusive file-provider Traefik only",
+    "No shared deployment, DNS, TLS or five-replica certification",
+    "Brief API load, not official extractor benchmark",
+    "SIGTERM tested during body upload followed by existing lookup; does not prove arbitrary long extraction completes",
+    "Memory evidence for this dataset and brief workload, not an upper bound on every upstream response"
+  ]
+}

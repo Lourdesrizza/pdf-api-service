@@ -104,7 +104,8 @@ services:
       EXTRACTOR_TIMEOUT_SECONDS: "30"
       DOCUMENT_TIMEOUT_SECONDS: "5"
       READY_CHECK_TIMEOUT_SECONDS: "2"
-      MAX_CONCURRENT_REQUESTS: "0"
+      BODY_TIMEOUT_SECONDS: "30"
+      MAX_CONCURRENT_REQUESTS: "2"
       LOG_LEVEL: INFO
     depends_on:
       extractor:
@@ -116,7 +117,7 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 1G
+          memory: 512M
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).close()"]
       interval: 5s
@@ -162,6 +163,7 @@ services:
       - ./verify.py:/tmp/verify.py:ro
       - ./persistence_check.py:/tmp/persistence_check.py:ro
       - ./dependency_check.py:/tmp/dependency_check.py:ro
+      - ./runtime_probe.py:/tmp/runtime_probe.py:ro
       - ./../../scripts/check_api.py:/tmp/check_api.py:ro
       - type: bind
         source: ${RUN_DIRECTORY:?Set RUN_DIRECTORY}/proof.pdf

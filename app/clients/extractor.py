@@ -33,10 +33,12 @@ class ExtractorClient:
                 headers={"Content-Type": "application/pdf", **correlation_headers()},
                 timeout=self.timeout,
             )
-        except httpx.TransportError as exc:
+        except httpx.RequestError as exc:
             raise map_transport_error(exc, "extractor") from exc
 
         map_upstream_status(response, "extractor", extractor=True)
+        if response.status_code != 200:
+            raise APIError(502, "invalid_upstream_response", "El extractor devolvió un estado inesperado.")
         try:
             result = ExtractionResult.model_validate(response.json())
         except (ValueError, TypeError) as exc:

@@ -1,3 +1,27 @@
+## Estado vigente — 04/11/2026
+
+El [informe de cierre](../../docs/cierre-2026-11-04.md) y `results/2026-11-04-summary.json` prevalecen sobre las corridas históricas que siguen. API se construye desde HEAD c9a4b03 más cambios locales; el probe compara SHA-256 de todos los fuentes app/*.py dentro de la imagen contra el árbol local. API corre con 1 CPU, 512 MiB y admisión 2. Los clones hermanos permanecen en sus commits históricos sin modificarlos.
+
+Para Documents actual se añadió `-CurrentDocumentsSnapshot`: descarga el archivo fuente del commit `2e6a806b94459be5ca788bb278dc6dc03f139388` dentro de `run/<id>/source/`, registra hash del ZIP y usa esa carpeta como build context. No ejecuta fetch ni checkout en el repositorio ajeno. Sin ese flag conserva la reproducción histórica con Documents 8e1214d. Si el HEAD remoto cambia nuevamente, revisar el nuevo contrato antes de cambiar este pin.
+
+```powershell
+.\integration\real-stack\run.ps1 `
+  -ExtractorRepoPath 'C:\dev\pdf-proyecto\pdf-extractor-service-review' `
+  -DocumentsRepoPath 'C:\dev\pdf-proyecto\pdf-document-service-review' `
+  -PdfPath 'C:\Users\lulir\Downloads\pdf279hojas.pdf' `
+  -CurrentDocumentsSnapshot -RunIntegration
+```
+
+Con snapshot actual y sin -SkipLoad, runtime_host.py mide dos PDFs nuevos simultáneos (variantes identificadas por comentarios PDF después de EOF, no el original), luego repeticiones del original con concurrencia 2 durante cinco segundos. Registra estados, fuentes, latencias, docker stats y memory.peak del cgroup. Extractor mantiene MAX_IN_FLIGHT=1: un 503 bajo carga nueva es una observación esperada, sin reintento automático. Comprueba directamente Documents 413 con Markdown de 17 MiB.
+
+El probe de apagado envía parte del PDF, espera que la solicitud esté en curso, entrega SIGTERM solo al contenedor API propio y completa la carga. Exige respuesta 200 existing y logs de cierre del servidor. Registra la salida real (0 o 143), desactiva temporalmente restart de ese contenedor para inspeccionar la terminación y luego lo arranca para las pruebas de dependencias. No modifica handlers de señales de la API. `-SkipLoad` omite ambos escenarios de carga y este probe.
+
+La carpeta run contiene PDFs, snapshots y logs ignorados; no se agrega el original a Git. Se conservan imágenes de prueba y evidencia. El finally elimina exclusivamente contenedores/red del proyecto único. No certifica Traefik compartido, TLS ni cinco réplicas.
+
+---
+
+## Historial de corridas (29 y 30/10/2026)
+
 # Integración real aislada
 
 Este harness reproduce la integración API → Extractor real → Documents real → MongoDB 7 y la ruta por una instancia Traefik exclusiva de pruebas. Se mantiene bajo `integration/real-stack/`, separado del Compose independiente de la API. No modifica ni añade servicios al Compose de desarrollo, no conecta `pdf-network`, no publica puertos y no utiliza Redis.

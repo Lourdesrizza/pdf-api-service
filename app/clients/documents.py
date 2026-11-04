@@ -31,12 +31,14 @@ class DocumentClient:
                 headers=correlation_headers(),
                 timeout=self.timeout,
             )
-        except httpx.TransportError as exc:
+        except httpx.RequestError as exc:
             raise map_transport_error(exc, "document service") from exc
 
         if response.status_code == 404:
             return None
         map_upstream_status(response, "document service")
+        if response.status_code != 200:
+            raise APIError(502, "invalid_upstream_response", "El document service devolvió un estado inesperado.")
         return self._parse(response, checksum)
 
     async def create(
@@ -60,7 +62,7 @@ class DocumentClient:
                 headers=correlation_headers(),
                 timeout=self.timeout,
             )
-        except httpx.TransportError as exc:
+        except httpx.RequestError as exc:
             raise map_transport_error(exc, "document service") from exc
 
         if response.status_code == 409:

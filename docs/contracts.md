@@ -26,3 +26,15 @@
 ## Reproducción de integración real
 
 El Compose aislado, proveedor de archivo de Traefik, generador de fixtures pequeños y probes están en [`integration/real-stack/`](../integration/real-stack/README.md). La guía fija los commits revisados del Extractor y Documents; las rutas de los tres checkouts son parámetros y la API se construye desde su árbol de trabajo. La ejecución no usa `pdf-network`, no publica puertos y elimina solo sus contenedores/red al terminar.
+
+## Revalidación 04/11/2026
+
+Extractor HEAD remoto `5f0de842ee1bcdcd23ce1383427f6b757d8882fa`; Infra `ff9223ad4640edfd3b2b3fd9b9b8549ecd097615`, red externa pdf-network, entrypoint web HTTP. Documents HEAD remoto `2e6a806b94459be5ca788bb278dc6dc03f139388`, posterior al checkout histórico `8e1214d0ec82df3806c096840e3dea12defe69d5`. Se leyó main.py/schemas.py actuales por URL fijada a commit. Mantiene rutas y estados de éxito y agrega DocumentTooLarge → 413; page_count también tiene máximo BSON entero de 64 bits.
+
+La API exige **200** en Extractor y GET Documents; no admite 201, 202, 204, 206 o redirecciones como éxito aunque contengan JSON válido. POST Documents admite solo 200/201 y 409 para reconsulta. Un 413 de Documents se traduce a 502 sanitizado: falla la persistencia upstream, no el límite del cuerpo PDF. No se modificó esa traducción pública.
+
+La frontera acepta binario o una única parte file. Rechaza partes adicionales/anidadas, transfer encoding, boundary ausente y cierres defectuosos con 400. 20 MiB limita el cuerpo completo, incluido multipart. Se valida Content-Length antes de leer y se cuenta lo efectivamente recibido. BODY_TIMEOUT_SECONDS=30 limita toda la recepción y produce 408 con error body_timeout. Cancelación libera la admisión. X-Request-ID se devuelve también en 500; los logs no incluyen inputs de validación, PDF, Markdown ni texto de excepciones inesperadas.
+
+Matriz: entrada inválida 400; recepción lenta 408; carga/extractor 413 → 413; tipo de entrada 415; extractor 400/415 → 422; upstream 429/503 → 503 con Retry-After validado; timeout upstream → 504; conexión, protocolo, estado/JSON/schema/checksum inválidos y Documents 413 → 502; fallo interno → 500.
+
+Consultar [cierre y evidencia](cierre-2026-11-04.md) para distinguir la ejecución actual de los antecedentes.

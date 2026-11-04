@@ -4,6 +4,7 @@ param(
     [string]$ExtractorRepoPath,
     [string]$DocumentsRepoPath,
     [string]$PdfPath,
+    [switch]$CurrentDocumentsSnapshot,
     [switch]$RunIntegration,
     [switch]$SkipLoad,
     [switch]$CleanupOnly
@@ -169,6 +170,18 @@ try {
         documentsImage = "pdf-documents-real:$runId"
         mongoDatabase = $safeDatabase
     }
+    if ($CurrentDocumentsSnapshot) {
+        # Download a pinned source archive into this API repository only.
+        # Never fetch, checkout or write in the teammate's repository.
+        $revision = '2e6a806b94459be5ca788bb278dc6dc03f139388'
+        $archivePath = Join-Path $runPath 'documents-source.zip'
+        Invoke-WebRequest -Uri "https://codeload.github.com/angelina-magallanes/pdf-document-service/zip/$revision" -OutFile $archivePath
+        Expand-Archive -LiteralPath $archivePath -DestinationPath (Join-Path $runPath 'source')
+        $metadata.documentsRepoPath = (Join-Path $runPath "source/pdf-document-service-$revision").Replace('\', '/')
+        $metadata.documentsHead = $revision
+        $metadata.documentsSource = 'GitHub pinned source archive, downloaded inside API repository'
+        $metadata.documentsArchiveSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
     $metadata | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $metadataPath -Encoding utf8
     $metadata | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runPath 'source-versions.json') -Encoding utf8
     Set-ComposeEnvironment $metadata
@@ -228,6 +241,12 @@ try {
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runPath 'api-load.json') -Encoding utf8
     } else {
         Invoke-LoggedDocker -Arguments (@('compose', '--profile', 'client', '-p', $project, '--project-directory', $PSScriptRoot, '-f', $composePath, 'run', '--rm', '-T', '--entrypoint', 'python', 'client', '/tmp/check_api.py', 'load', '--url', 'http://api:8000/process', '--pdf', '/fixtures/proof.pdf', '--dedicated-test-environment', '--concurrency', '1', '--duration', '5')) -LogPath (Join-Path $runPath 'api-load.json')
+    }
+
+    if ($CurrentDocumentsSnapshot -and -not $SkipLoad) {
+        & python (Join-Path $PSScriptRoot 'runtime_host.py') $metadataPath
+        if ($LASTEXITCODE -ne 0) { throw 'Runtime load/SIGTERM checks failed' }
+        Wait-Healthy -Service 'api'
     }
 
     Invoke-LoggedDocker -Arguments ($composeBase + @('stop', 'extractor')) -LogPath (Join-Path $runPath 'stop-extractor.log')
