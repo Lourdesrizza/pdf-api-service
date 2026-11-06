@@ -1,6 +1,10 @@
 # Auditoría del estado actual de pdf-api-service
 
-## Estado vigente — cierre verificado 04/11/2026
+## Estado vigente — actualización documental 06/11/2026
+
+Aceptación compartida **reportada por Jeremías**: health/ready/process por HTTP, extracted seguido de existing con igual checksum y sin llamadas adicionales al Extractor, PDF de 279 páginas aceptado, reconstrucción de solo API disponible y métricas del Extractor habilitadas. Su mensaje no incluye fecha de ejecución, commits desplegados, imagen ni logs. No se ejecutaron pruebas compartidas en esta revisión. No se identifican pendientes funcionales obligatorios propios de API; resta trazabilidad y revisión/entrega documental. [Detalle y pedido breve de evidencias existentes](docs/cierre-2026-11-04.md). No se certifican TLS, cinco réplicas ni benchmark oficial.
+
+## Cierre verificado aislado — 04/11/2026
 
 Esta sección prevalece sobre todo el historial que sigue. Informe completo: [docs/cierre-2026-11-04.md](docs/cierre-2026-11-04.md); evidencia resumida: [integration/real-stack/results/2026-11-04-summary.json](integration/real-stack/results/2026-11-04-summary.json).
 
@@ -12,7 +16,7 @@ Esta sección prevalece sobre todo el historial que sigue. Informe completo: [do
 - SIGTERM durante recepción: petición completó 200 existing, cierre de servidor confirmado en 3,692 s, **salida real 143**. PORT=8123 también verificado. No se agregó readiness de drenado ni señales propias.
 - Documents 413 real por Markdown de 17 MiB confirmado; API mantiene traducción pública 502, documentada y con regresión.
 - uv lock --check, git diff --check, Compose base/base+dev/test/real y sintaxis Python/PowerShell aprobados. Los tres proyectos propios quedaron sin contenedores/red; imágenes y evidencia se conservaron. PDF original no agregado a Git.
-- API lista para integrar con los commits probados. Pendiente externo: aceptación del entorno compartido/versiones/DNS/HTTP con base descartable coordinada, dataset y benchmark oficial del Extractor. Esta prueba no acredita TLS, cinco réplicas ni finalización del sistema grupal. Mensajes propuestos y guion oral en el informe de cierre; no se enviaron mensajes.
+- Estado histórico al 04/11, actualizado por el reporte del 06/11 arriba: API lista para integrar con los commits probados. Pendiente externo entonces: aceptación del entorno compartido/versiones/DNS/HTTP con base descartable coordinada, dataset y benchmark oficial del Extractor. Esta prueba no acredita TLS, cinco réplicas ni finalización del sistema grupal. Mensajes propuestos y guion oral en el informe de cierre; no se enviaron mensajes.
 
 ## Historial conservado — antecedentes, no lista vigente de pendientes
 

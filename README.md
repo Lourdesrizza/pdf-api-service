@@ -111,6 +111,12 @@ curl.exe http://127.0.0.1:8002/ready
 docker compose -p $testProject -f docker-compose.test.yml down
 ```
 
+## Aceptación compartida reportada por Jeremías
+
+Registrada el 06/11/2026, sin fecha de ejecución informada: Jeremías reporta `/health`, `/ready` y `/process` operativos por `http://api.universidad.localhost`, primer envío `extracted`, repetido `existing` con igual checksum y sin nuevas llamadas al Extractor, y aceptación del PDF de 279 páginas. También informa reconstrucción de solo API y `METRICS_ENABLED=true` en Extractor.
+
+El mensaje no incluye commits desplegados, imagen ni logs. Es aceptación **reportada por Jeremías**, con trazabilidad pendiente; no una prueba ejecutada en esta revisión. Ver [alcance, faltantes y mensaje propuesto](docs/cierre-2026-11-04.md). No acredita TLS, cinco réplicas ni benchmark oficial. La evidencia aislada se conserva separada a continuación.
+
 ## Integración real en un entorno dedicado
 
 La integración API → Extractor real → Documents real → MongoDB 7 se ejecutó el 29/10/2026. El resultado resumido está en [`integration/real-stack/results/2026-10-29-summary.json`](integration/real-stack/results/2026-10-29-summary.json). El 30/10/2026 se aceptó además el PDF original de 279 páginas; su evidencia está en [`integration/real-stack/results/2026-10-30-pdf279-summary.json`](integration/real-stack/results/2026-10-30-pdf279-summary.json). El Compose y los probes reproducibles están en [`integration/real-stack/README.md`](integration/real-stack/README.md); no dependen de la carpeta externa de logs. No se versionan PDFs originales ni generados durante las pruebas. El generador crea dos fixtures sintéticos pequeños en una carpeta ignorada; no son los PDFs oficiales de carga. `tests/fixtures/sample.pdf` es un fixture controlado versionado.

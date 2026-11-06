@@ -1,4 +1,10 @@
-## Estado vigente — 04/11/2026
+## Aceptación compartida reportada — registro 06/11/2026
+
+Jeremías reportó health/ready/process por `http://api.universidad.localhost`, extracted seguido de existing con igual checksum y cero llamadas adicionales al Extractor, aceptación del PDF de 279 páginas, `METRICS_ENABLED=true` y posibilidad de reconstruir solo API con `docker compose -f docker-compose.integration.yml up -d --no-deps --build api`. No se ejecutó ese comando en esta revisión.
+
+El mensaje no incluye fecha de ejecución, commits desplegados, imagen ni logs. La trazabilidad sigue pendiente; ver [cierre actualizado y mensaje propuesto](../../docs/cierre-2026-11-04.md). Este reporte no se mezcla con los JSON de ejecuciones aisladas ni acredita TLS, cinco réplicas o benchmark oficial.
+
+## Evidencia aislada vigente — 04/11/2026
 
 El [informe de cierre](../../docs/cierre-2026-11-04.md) y `results/2026-11-04-summary.json` prevalecen sobre las corridas históricas que siguen. API se construye desde HEAD c9a4b03 más cambios locales; el probe compara SHA-256 de todos los fuentes app/*.py dentro de la imagen contra el árbol local. API corre con 1 CPU, 512 MiB y admisión 2. Los clones hermanos permanecen en sus commits históricos sin modificarlos.
 
@@ -117,13 +123,15 @@ Los IDs de las tres imágenes construidas se registraron en el resumen y sus tag
 
 ## Revisión estática de la infraestructura compartida
 
-Lectura del checkout disponible de `pdf-infrastructure` en `ff9223ad4640edfd3b2b3fd9b9b8549ecd097615` (29/10/2026); no se ejecutó ni modificó ese despliegue. Su `docker-compose.integration.yml` construye la API desde `../pdf-api-service/Dockerfile`, usando los aliases `extractor:8000` y `documents:8000`, coherentes con esta API. El puerto interno es 8000 y `pdf-network` es externa. Para incorporar la versión API registrada actualmente, el checkout usado como contexto debe estar limpio y en `3d3308e51ae6337ba25be7a82bb55e0fe859a849` antes de reconstruir únicamente `api`.
+Lectura del checkout disponible de `pdf-infrastructure` en `ff9223ad4640edfd3b2b3fd9b9b8549ecd097615` (29/10/2026); no se ejecutó ni modificó ese despliegue. Su `docker-compose.integration.yml` construye la API desde `../pdf-api-service/Dockerfile`, usando los aliases `extractor:8000` y `documents:8000`, coherentes con esta API. El puerto interno es 8000 y `pdf-network` es externa. El procedimiento histórico fijaba un commit de API; ese pin no identifica la versión desplegada en la aceptación reportada. Para reproducir aquella actualización, el checkout usado como contexto debe estar limpio y en `3d3308e51ae6337ba25be7a82bb55e0fe859a849` antes de reconstruir únicamente `api`.
 
 La ruta declarada es `api.universidad.localhost` en el entrypoint `web` (HTTP puerto 80); ese Compose no configura TLS y el hostname `.localhost` es local a la máquina. El healthcheck de Docker y el healthcheck activo de Traefik consultan `/health`, que en esta API es liveness; no consultan `/ready`, que valida Extractor y Documents. La configuración inyecta `REDIS_URL` a la API aunque el código de API no la usa. El límite configurado para API en infraestructura es 1 CPU / 1 GiB, frente a 1 CPU / 512 MiB en el Compose independiente de esta API; Jeremías debe confirmar el límite acordado.
 
-El Compose compartido no fija `METRICS_ENABLED` para Extractor. Su valor predeterminado es `false`, así que no se publica `/metrics` en las réplicas actuales. Para verificar el contador de extracción en todas las réplicas, Jeremías debe habilitarlo en el servicio y configurar el scrape de cada réplica; la instancia Traefik aislada del harness no verifica ese scrape.
+En el Compose leído históricamente no se fijaba `METRICS_ENABLED` para Extractor (default `false`). Jeremías ahora reporta `METRICS_ENABLED=true`; queda pendiente adjuntar configuración efectiva y evidencia del contador con las instancias medidas. No se infiere scrape de todas las réplicas; el harness aislado tampoco lo verifica.
 
-### Procedimiento propuesto para actualizar solo la API
+### Procedimiento histórico propuesto para actualizar solo la API
+
+El pin siguiente es histórico, no una instrucción de despliegue vigente ni evidencia de la imagen compartida. La capacidad actual de reconstruir solo API fue reportada por Jeremías arriba.
 
 Usar un checkout de despliegue limpio con el layout de repositorios hermanos que espera el Compose. No cambiar ni limpiar el checkout de API de la autora. Confirmar además que el nombre de proyecto Compose, los archivos `-f` y las variables sean los mismos del stack compartido; una invocación con otro proyecto podría crear volúmenes con otro prefijo. La siguiente operación no ejecuta `down` ni reconstruye Mongo, Redis, Extractor o Documents:
 
@@ -171,12 +179,12 @@ docker image tag $rollbackTag $oldImageRef
 docker compose @compose up -d --no-deps --no-build --force-recreate api
 ```
 
-Antes de enviar un PDF por la URL compartida, Jeremías debe confirmar una base Mongo de integración dedicada y descartable. Sin ella, limitar la verificación a `/health` y `/ready`; no persistir documentos de prueba en la base compartida. La prueba autorizada para ese entorno dedicado debe enviar el mismo PDF dos veces, revisar `extracted` y luego `existing`, recuperar el documento persistido y sumar `pdf_http_requests_total{method="POST",route="/extract"}` en todas las réplicas antes y después.
+La aceptación funcional compartida ya fue reportada; se solicitan sus evidencias existentes, sin repetir cargas. Para futuras pruebas autorizadas, antes de enviar un PDF por la URL compartida, Jeremías debe confirmar una base Mongo de integración dedicada y descartable. Sin ella, limitar la verificación a `/health` y `/ready`; no persistir documentos de prueba en la base compartida. La prueba autorizada para ese entorno dedicado debe enviar el mismo PDF dos veces, revisar `extracted` y luego `existing`, recuperar el documento persistido y sumar `pdf_http_requests_total{method="POST",route="/extract"}` en todas las réplicas antes y después.
 
 ## Pendientes externos explícitos
 
 - Recibir e integrar el dataset oficial de cuatro PDFs; `tests/stress/pdfs/` no estaba disponible en los checkouts revisados. El PDF original de 279 páginas ya se aceptó en la corrida del 30/10/2026; no sustituye ese dataset.
-- Probar DNS, TLS y rutas mediante el Traefik compartido en un entorno autorizado. La instancia aislada no representa ese despliegue.
+- Completar identificadores y evidencias existentes de la aceptación HTTP compartida reportada por Jeremías. TLS no fue acreditado ni se exige una nueva prueba TLS como pendiente propio de API. La instancia aislada no representa ese despliegue.
 - Ejecutar el benchmark oficial del Extractor (k6/Vegeta) con el dataset oficial en el entorno responsable del Extractor. La carga API registrada mide principalmente deduplicación y no sustituye ese benchmark.
 
 Estos pendientes significan que no se declara terminada la entrega grupal.
