@@ -9,30 +9,34 @@ logger = logging.getLogger("pdf_api")
 request_id_context: ContextVar[str] = ContextVar("request_id", default="unknown")
 
 
+class UpstreamFailure(APIError):
+    """A failed operation that contributes to opening the dependency circuit."""
+
+
 def correlation_headers() -> dict[str, str]:
     return {"X-Request-ID": request_id_context.get()}
 
 
-def map_transport_error(exc: httpx.RequestError, service: str) -> APIError:
+def map_transport_error(exc: httpx.RequestError | TimeoutError, service: str) -> UpstreamFailure:
     logger.error(
         "Upstream transport failure service=%s type=%s request_id=%s",
         service,
         type(exc).__name__,
         request_id_context.get(),
     )
-    if isinstance(exc, httpx.TimeoutException):
-        return APIError(
+    if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+        return UpstreamFailure(
             504,
             "upstream_timeout",
             f"Se agotó el tiempo de espera del servicio {service}.",
         )
     if isinstance(exc, (httpx.ConnectError, httpx.NetworkError, httpx.ProtocolError)):
-        return APIError(
+        return UpstreamFailure(
             502,
             "upstream_unavailable",
             f"El servicio {service} no está disponible.",
         )
-    return APIError(
+    return UpstreamFailure(
         502,
         "upstream_error",
         f"No se pudo procesar la respuesta del servicio {service}.",
@@ -61,16 +65,17 @@ def map_upstream_status(response: httpx.Response, service: str, *, extractor: bo
     if extractor and response.status_code == 413:
         raise APIError(413, "file_too_large", "El PDF supera el límite del extractor.")
     if response.status_code in (429, 503):
-        raise APIError(
+        raise UpstreamFailure(
             503,
             "upstream_unavailable",
             f"El servicio {service} está saturado o no disponible.",
             headers={"Retry-After": _retry_after(response)},
         )
     if response.status_code >= 500:
-        raise APIError(502, "upstream_error", f"El servicio {service} devolvió un error.")
+        raise UpstreamFailure(502, "upstream_error", f"El servicio {service} devolvió un error.")
     if response.status_code >= 400:
-        raise APIError(
+        error_type = UpstreamFailure if response.status_code == 408 else APIError
+        raise error_type(
             502,
             "upstream_error",
             f"El servicio {service} devolvió una respuesta inesperada.",

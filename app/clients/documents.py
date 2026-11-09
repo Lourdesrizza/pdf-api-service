@@ -1,11 +1,19 @@
 """HTTP client for the Documents service contract."""
 
+from asyncio import sleep, timeout
+
 import httpx
 from pydantic import SecretStr
 
-from app.clients.base import correlation_headers, map_transport_error, map_upstream_status
-from app.errors import APIError
+from app.clients.base import UpstreamFailure, correlation_headers, map_transport_error, map_upstream_status
+from app.clients.circuit import CircuitBreaker
 from app.schemas import DocumentCreation, DocumentPayload
+
+
+SERVICE = "document service"
+CHECKSUM_RETRY_DELAY_SECONDS = 0.05
+CHECKSUM_RETRY_STATUSES = {408, 500, 502, 503, 504}
+CHECKSUM_RETRY_ERRORS = (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError)
 
 
 class DocumentClient:
@@ -17,6 +25,7 @@ class DocumentClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._api_token = api_token
+        self._circuit = CircuitBreaker(SERVICE)
 
     def _document_headers(self) -> dict[str, str]:
         headers = correlation_headers()
@@ -36,21 +45,37 @@ class DocumentClient:
             return False
 
     async def find_by_checksum(self, checksum: str) -> DocumentPayload | None:
-        try:
-            response = await self.http.get(
-                f"{self.base_url}/documents/by-checksum/{checksum}",
-                headers=self._document_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.RequestError as exc:
-            raise map_transport_error(exc, "document service") from exc
+        with self._circuit.operation() as probe:
+            response = await self._get_checksum(checksum, allow_retry=not probe)
+            if response.status_code == 404:
+                return None
+            map_upstream_status(response, SERVICE)
+            if response.status_code != 200:
+                raise UpstreamFailure(
+                    502, "invalid_upstream_response", "El document service devolvió un estado inesperado."
+                )
+            return self._parse(response, checksum)
 
-        if response.status_code == 404:
-            return None
-        map_upstream_status(response, "document service")
-        if response.status_code != 200:
-            raise APIError(502, "invalid_upstream_response", "El document service devolvió un estado inesperado.")
-        return self._parse(response, checksum)
+    async def _get_checksum(self, checksum: str, *, allow_retry: bool) -> httpx.Response:
+        url = f"{self.base_url}/documents/by-checksum/{checksum}"
+        headers = self._document_headers()
+        try:
+            async with timeout(self.timeout):
+                if allow_retry:
+                    try:
+                        response = await self.http.get(url, headers=headers, timeout=self.timeout)
+                    except CHECKSUM_RETRY_ERRORS:
+                        pass
+                    else:
+                        if (
+                            response.status_code not in CHECKSUM_RETRY_STATUSES
+                            or "Retry-After" in response.headers
+                        ):
+                            return response
+                    await sleep(CHECKSUM_RETRY_DELAY_SECONDS)
+                return await self.http.get(url, headers=headers, timeout=self.timeout)
+        except (httpx.RequestError, TimeoutError) as exc:
+            raise map_transport_error(exc, SERVICE) from exc
 
     async def create(
         self,
@@ -66,30 +91,31 @@ class DocumentClient:
             "content": content,
             "page_count": page_count,
         }
-        try:
-            response = await self.http.post(
-                f"{self.base_url}/documents",
-                json=body,
-                headers=self._document_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.RequestError as exc:
-            raise map_transport_error(exc, "document service") from exc
+        with self._circuit.operation():
+            try:
+                response = await self.http.post(
+                    f"{self.base_url}/documents",
+                    json=body,
+                    headers=self._document_headers(),
+                    timeout=self.timeout,
+                )
+            except httpx.RequestError as exc:
+                raise map_transport_error(exc, SERVICE) from exc
 
-        if response.status_code == 409:
-            return None
-        if response.status_code not in (200, 201):
-            map_upstream_status(response, "document service")
-            raise APIError(
-                502,
-                "upstream_error",
-                "El document service devolvió una respuesta inesperada.",
-            )
+            if response.status_code == 409:
+                return None
+            if response.status_code not in (200, 201):
+                map_upstream_status(response, SERVICE)
+                raise UpstreamFailure(
+                    502,
+                    "upstream_error",
+                    "El document service devolvió una respuesta inesperada.",
+                )
 
-        return DocumentCreation(
-            document=self._parse(response, checksum),
-            created=response.status_code == 201,
-        )
+            return DocumentCreation(
+                document=self._parse(response, checksum),
+                created=response.status_code == 201,
+            )
 
     @staticmethod
     def _parse(response: httpx.Response, checksum: str) -> DocumentPayload:
@@ -99,7 +125,7 @@ class DocumentClient:
                 raise ValueError("checksum mismatch")
             return document
         except (ValueError, TypeError) as exc:
-            raise APIError(
+            raise UpstreamFailure(
                 502,
                 "invalid_upstream_response",
                 "El document service devolvió una respuesta inválida.",

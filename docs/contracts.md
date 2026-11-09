@@ -18,10 +18,17 @@
 ## Correlación, errores y límites
 
 - Un `X-Request-ID` de hasta 128 caracteres ASCII imprimibles se conserva; si falta o no cumple el límite/alfabeto, la API genera uno. Se devuelve al cliente y se propaga en las llamadas HTTP a Extractor y Documents.
-- Para un 429/503 upstream, la API reenvía `Retry-After` si es entero decimal entre 1 y 86400; ante un valor ausente o inválido usa `1`. La API no reintenta llamadas upstream.
+- Para un 429/503 upstream, la API reenvía `Retry-After` si es entero decimal entre 1 y 86400; ante un valor ausente o inválido usa `1`.
 - Timeout upstream -> 504; conexión/protocolo o respuesta inválida -> 502. Los mensajes públicos no propagan el `detail` remoto.
 - Límite de 20 MiB sobre el cuerpo completo de la solicitud, incluido el envoltorio multipart.
 - `/health` es liveness de la API; `/ready` consulta `/health/ready` de Extractor y Documents.
+
+## Resiliencia de las llamadas de procesamiento
+
+- Documents y Extractor tienen circuitos independientes en memoria por proceso. La búsqueda y el guardado comparten el circuito de Documents. Las sondas de `/ready` consultan directamente a ambos servicios y quedan fuera de los circuitos.
+- El circuito abre tras tres fallos consecutivos de operación. Cuentan los errores de transporte, los estados 408, 429 y 5xx, y las respuestas inválidas. Los demás 4xx se consideran evidencia de que la dependencia respondió y conservan su tratamiento HTTP.
+- Durante 10 segundos, el circuito abierto rechaza operaciones con `503`, `upstream_unavailable` y `Retry-After` en segundos, sin llamar a la dependencia. Después admite una sola llamada de prueba. Una respuesta válida cierra el circuito. Un fallo o una cancelación de la prueba inicia otros 10 segundos de espera.
+- Con el circuito cerrado, el GET por checksum admite un reintento tras 50 ms por timeout, fallo de red, error de protocolo remoto o un estado 408, 500, 502, 503 o 504 sin `Retry-After`. `DOCUMENT_TIMEOUT_SECONDS` acota ambas llamadas y la pausa. Solo se contabiliza el resultado final. Las pruebas de recuperación y los POST de extracción y guardado hacen un solo intento.
 
 ## Reproducción de integración real
 

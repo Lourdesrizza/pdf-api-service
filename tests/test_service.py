@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.checksum import calculate_checksum
+from app.clients import circuit
 from app.config import Settings
 
 PDF = b"%PDF-1.4\nexample"
@@ -75,6 +76,32 @@ def test_existing_skips_extractor(client):
     assert result.json()["source"] == "existing"
     assert result.json()["content"] == "# text"
     assert not extractor.calls
+
+
+def test_open_extractor_returns_controlled_503_and_existing_pdf_still_works(client, monkeypatch):
+    monkeypatch.setattr(circuit, "monotonic", lambda: 0)
+    headers = {"Content-Type": "application/pdf", "X-Request-ID": "open-extractor"}
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
+        lookup = documents.get(f"/documents/by-checksum/{checksum}").mock(return_value=httpx.Response(404))
+        extract = extractor.post("/extract").mock(return_value=httpx.Response(500))
+        for _ in range(3):
+            assert client.post("/process", content=PDF, headers=headers).status_code == 502
+
+        rejected = client.post("/process", content=PDF, headers=headers)
+        assert rejected.status_code == 503
+        assert rejected.json() == {
+            "error": "upstream_unavailable",
+            "detail": "El servicio extractor no está disponible.",
+        }
+        assert rejected.headers["Retry-After"] == "10"
+        assert rejected.headers["X-Request-ID"] == "open-extractor"
+
+        lookup.mock(return_value=httpx.Response(200, json=doc()))
+        repeated = client.post("/process", content=PDF, headers=headers)
+        assert repeated.status_code == 200
+        assert repeated.json()["source"] == "existing"
+        assert extract.call_count == 3
 
 
 @pytest.mark.parametrize("multipart", [False, True])
