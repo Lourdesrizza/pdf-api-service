@@ -62,6 +62,7 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 |---|---:|---|
 | `EXTRACTOR_URL` | `http://extractor:8000` | URL base del extractor |
 | `DOCUMENT_SERVICE_URL` | `http://documents:8000` | URL base de documentos |
+| `DOCUMENTS_API_TOKEN` | Vacío para fakes y revisiones históricas | Secreto compartido obligatorio al usar Documents con Bearer |
 | `PORT` | `8000` | Puerto HTTP |
 | `MAX_UPLOAD_BYTES` | `20971520` | Máximo de carga, 20 MiB |
 | `EXTRACTOR_TIMEOUT_SECONDS` | `30` | Timeout de extracción |
@@ -76,6 +77,15 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 | `DEV_PORT` | `8002` | Puerto publicado en 127.0.0.1 por el override dev |
 
 Dentro de Docker, usar DNS de servicio (`extractor`, `documents`), nunca `localhost`.
+
+Con Documents autenticado, inyectar el mismo `DOCUMENTS_API_TOKEN` en ambos
+contenedores desde el entorno o el gestor de secretos. El Compose compartido
+debe pasarlo expresamente a `api` y `documents`. La API usa la credencial para
+las operaciones de documentos, incluidas las búsquedas por checksum. Health y
+Extractor quedan fuera de ese intercambio. `/ready` comprueba disponibilidad
+de las dependencias, así que el ensayo de la credencial requiere `/process`.
+Con un PDF nuevo, esperar `source=extracted`. Repetir exactamente los mismos
+bytes y verificar `source=existing`, con el mismo ID y checksum.
 
 ## Instalar, ejecutar y testear
 

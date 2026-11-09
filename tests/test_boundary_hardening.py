@@ -35,6 +35,14 @@ def test_local_and_service_urls():
     assert config.extractor_url == "http://localhost:8001"
 
 
+def test_invalid_documents_token_is_redacted(monkeypatch):
+    token = "fake invalid token"
+    monkeypatch.setenv("DOCUMENTS_API_TOKEN", token)
+    with pytest.raises(ValidationError, match="DOCUMENTS_API_TOKEN") as error:
+        Settings(_env_file=None)
+    assert token not in str(error.value)
+
+
 def request_for(receive, headers=()):
     return Request({"type": "http", "headers": [(b"content-type", b"application/pdf"), *headers]}, receive)
 

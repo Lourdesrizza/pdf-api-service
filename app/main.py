@@ -70,6 +70,7 @@ async def lifespan(app: FastAPI):
             client,
             settings.document_service_url,
             settings.document_timeout_seconds,
+            api_token=settings.documents_api_token,
         )
         extractor = ExtractorClient(
             client,

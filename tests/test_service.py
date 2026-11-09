@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.checksum import calculate_checksum
+from app.config import Settings
 
 PDF = b"%PDF-1.4\nexample"
 EXTRACTOR = "http://extractor:8000"
@@ -72,6 +73,66 @@ def test_existing_skips_extractor(client):
     assert result.status_code == 200
     assert result.json()["source"] == "existing"
     assert result.json()["content"] == "# text"
+    assert not extractor.calls
+
+
+def test_documents_bearer_new_and_repeated_pdf(monkeypatch):
+    token = "fake-documents-test-token-only-12345"
+    monkeypatch.setenv("DOCUMENTS_API_TOKEN", token)
+    config = Settings(_env_file=None)
+    assert token not in repr(config)
+    install_settings(monkeypatch, documents_api_token=config.documents_api_token)
+    checksum = calculate_checksum(PDF)
+    with (
+        TestClient(main.app) as client,
+        respx.mock(base_url=DOCUMENTS) as documents,
+        respx.mock(base_url=EXTRACTOR) as extractor,
+    ):
+        lookup = documents.get(f"/documents/by-checksum/{checksum}").mock(
+            side_effect=[httpx.Response(404), httpx.Response(200, json=doc())],
+        )
+        save = documents.post("/documents").mock(return_value=httpx.Response(201, json=doc()))
+        documents_ready = documents.get("/health/ready").mock(return_value=httpx.Response(200))
+        extractor_ready = extractor.get("/health/ready").mock(return_value=httpx.Response(200))
+        extract = extractor.post("/extract").mock(
+            return_value=httpx.Response(200, json={"content": "# text", "page_count": 1}),
+        )
+        headers = {
+            "Content-Type": "application/pdf",
+            "Authorization": "Bearer incoming-client-token",
+            "X-Request-ID": "documents-auth-test",
+        }
+        assert client.get("/ready", headers=headers).status_code == 200
+        first = client.post("/process", content=PDF, headers=headers)
+        repeated = client.post("/process", content=PDF, headers=headers)
+
+    assert first.status_code == repeated.status_code == 200
+    assert first.json()["source"] == "extracted"
+    assert repeated.json()["source"] == "existing"
+    assert first.json()["checksum"] == repeated.json()["checksum"] == checksum
+    assert first.json()["document_id"] == repeated.json()["document_id"] == "abc123"
+    assert lookup.call_count == 2
+    assert save.call_count == extract.call_count == 1
+    for call in [*lookup.calls, *save.calls]:
+        assert call.request.headers["authorization"] == f"Bearer {token}"
+        assert call.request.headers["x-request-id"] == "documents-auth-test"
+    for route in (documents_ready, extractor_ready, extract):
+        assert "authorization" not in route.calls.last.request.headers
+
+
+def test_documents_unauthorized_stops_processing(client, caplog):
+    checksum = calculate_checksum(PDF)
+    with respx.mock(base_url=DOCUMENTS) as documents, respx.mock(base_url=EXTRACTOR) as extractor:
+        documents.get(f"/documents/by-checksum/{checksum}").mock(
+            return_value=httpx.Response(
+                401, headers={"WWW-Authenticate": "Bearer"}, json={"detail": "internal-auth-detail"},
+            ),
+        )
+        result = client.post("/process", content=PDF, headers={"Content-Type": "application/pdf"})
+    assert result.status_code == 502
+    assert result.json()["error"] == "upstream_error"
+    assert "www-authenticate" not in result.headers
+    assert "internal-auth-detail" not in result.text + caplog.text
     assert not extractor.calls
 
 

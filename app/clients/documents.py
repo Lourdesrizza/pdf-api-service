@@ -1,6 +1,7 @@
 """HTTP client for the Documents service contract."""
 
 import httpx
+from pydantic import SecretStr
 
 from app.clients.base import correlation_headers, map_transport_error, map_upstream_status
 from app.errors import APIError
@@ -8,10 +9,20 @@ from app.schemas import DocumentCreation, DocumentPayload
 
 
 class DocumentClient:
-    def __init__(self, http: httpx.AsyncClient, base_url: str, timeout: float = 5):
+    def __init__(
+        self, http: httpx.AsyncClient, base_url: str, timeout: float = 5,
+        *, api_token: SecretStr | None = None,
+    ):
         self.http = http
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._api_token = api_token
+
+    def _document_headers(self) -> dict[str, str]:
+        headers = correlation_headers()
+        if self._api_token:
+            headers["Authorization"] = f"Bearer {self._api_token.get_secret_value()}"
+        return headers
 
     async def health(self, timeout: float) -> bool:
         try:
@@ -28,7 +39,7 @@ class DocumentClient:
         try:
             response = await self.http.get(
                 f"{self.base_url}/documents/by-checksum/{checksum}",
-                headers=correlation_headers(),
+                headers=self._document_headers(),
                 timeout=self.timeout,
             )
         except httpx.RequestError as exc:
@@ -59,7 +70,7 @@ class DocumentClient:
             response = await self.http.post(
                 f"{self.base_url}/documents",
                 json=body,
-                headers=correlation_headers(),
+                headers=self._document_headers(),
                 timeout=self.timeout,
             )
         except httpx.RequestError as exc:
