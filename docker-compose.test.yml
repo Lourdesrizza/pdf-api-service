@@ -10,6 +10,8 @@ services:
     environment:
       EXTRACTOR_URL: http://fake-extractor:8000
       DOCUMENT_SERVICE_URL: http://fake-documents:8000
+      API_REQUIRE_AUTH: ${API_REQUIRE_AUTH:-false}
+      API_ACCESS_TOKEN: ${API_ACCESS_TOKEN:-}
       MAX_UPLOAD_BYTES: "20971520"
       BODY_TIMEOUT_SECONDS: "30"
       MAX_CONCURRENT_REQUESTS: "2"

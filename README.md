@@ -63,6 +63,8 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 | `EXTRACTOR_URL` | `http://extractor:8000` | URL base del extractor |
 | `DOCUMENT_SERVICE_URL` | `http://documents:8000` | URL base de documentos |
 | `DOCUMENTS_API_TOKEN` | Vacío para fakes y revisiones históricas | Secreto compartido obligatorio al usar Documents con Bearer |
+| `API_REQUIRE_AUTH` | `false` | Exige autenticación Bearer en `POST /process` cuando es `true` |
+| `API_ACCESS_TOKEN` | Vacío | Credencial del cliente para `POST /process`, obligatoria en modo restringido |
 | `PORT` | `8000` | Puerto HTTP |
 | `MAX_UPLOAD_BYTES` | `20971520` | Máximo de carga, 20 MiB |
 | `EXTRACTOR_TIMEOUT_SECONDS` | `30` | Timeout de extracción |
@@ -86,6 +88,49 @@ Extractor quedan fuera de ese intercambio. `/ready` comprueba disponibilidad
 de las dependencias, así que el ensayo de la credencial requiere `/process`.
 Con un PDF nuevo, esperar `source=extracted`. Repetir exactamente los mismos
 bytes y verificar `source=existing`, con el mismo ID y checksum.
+
+### Modo restringido para `POST /process`
+
+Configurá `API_REQUIRE_AUTH=true` y `API_ACCESS_TOKEN` en el entorno de la
+aplicación o en su `.env`. El Compose principal de este repositorio carga
+`.env` mediante `env_file`. El token debe tener entre 32 y 512 caracteres
+de `A-Z`, `a-z`, `0-9` o `._~+/-`, seguidos opcionalmente de uno o dos
+`=`. Si falta, está vacío o tiene un formato inválido, la API rechaza el
+arranque e identifica la variable sin mostrar el valor.
+
+Enviá una sola cabecera `Authorization: Bearer <token>` para procesar un PDF.
+Un fallo de autenticación devuelve `401` con `WWW-Authenticate: Bearer`
+y un error JSON. `/health` y `/ready` siguen disponibles sin credencial.
+`DOCUMENTS_API_TOKEN` se configura por separado para las llamadas a Documents.
+
+Para la demo en PowerShell, usá el Compose aislado de este repositorio con
+una credencial ficticia y el puerto local 8002 libre.
+
+```powershell
+$env:API_REQUIRE_AUTH = 'true'
+$env:API_ACCESS_TOKEN = 'fake-demo-process-token-only-123456789'
+$testProject = "pdf-api-auth-demo-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
+docker compose -p $testProject -f docker-compose.test.yml up --build -d
+
+$baseUrl = 'http://127.0.0.1:8002'
+curl.exe -i "$baseUrl/health"
+curl.exe -i "$baseUrl/ready"  # Esperá a que responda 200 antes de enviar el PDF.
+curl.exe -i "$baseUrl/process" -H 'Content-Type: application/pdf' `
+  --data-binary '@tests/fixtures/sample.pdf'  # 401
+
+$headers = @{ Authorization = "Bearer $env:API_ACCESS_TOKEN" }
+1..2 | ForEach-Object {
+  Invoke-RestMethod -Method Post -Uri "$baseUrl/process" -Headers $headers `
+    -ContentType 'application/pdf' -InFile './tests/fixtures/sample.pdf' |
+    Select-Object source, document_id, checksum
+}
+
+docker compose -p $testProject -f docker-compose.test.yml down
+Remove-Item Env:API_REQUIRE_AUTH, Env:API_ACCESS_TOKEN
+```
+
+El primer envío autorizado devuelve `extracted` y el segundo `existing`,
+con el mismo `document_id` y `checksum`.
 
 ## Instalar, ejecutar y testear
 

@@ -1,14 +1,19 @@
 from functools import lru_cache
 from re import fullmatch
 
-from pydantic import Field, HttpUrl, SecretStr, TypeAdapter, field_validator
+from pydantic import Field, HttpUrl, SecretStr, TypeAdapter, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BEARER_TOKEN_PATTERN = r"[A-Za-z0-9._~+/-]{32,512}={0,2}"
 
 
 class Settings(BaseSettings):
     extractor_url: str = "http://extractor:8000"
     document_service_url: str = "http://documents:8000"
     documents_api_token: SecretStr = SecretStr("")
+    api_require_auth: bool = False
+    api_access_token: SecretStr = SecretStr("")
     port: int = Field(default=8000, ge=1, le=65535)
     max_upload_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
     extractor_timeout_seconds: float = Field(default=30, gt=0, allow_inf_nan=False)
@@ -26,8 +31,17 @@ class Settings(BaseSettings):
     @classmethod
     def validate_documents_api_token(cls, value: SecretStr) -> SecretStr:
         token = value.get_secret_value()
-        if token and not fullmatch(r"[A-Za-z0-9._~+/-]{32,512}={0,2}", token):
+        if token and not fullmatch(BEARER_TOKEN_PATTERN, token):
             raise ValueError("DOCUMENTS_API_TOKEN no tiene un formato Bearer válido")
+        return value
+
+    @field_validator("api_access_token")
+    @classmethod
+    def validate_api_access_token(cls, value: SecretStr, info: ValidationInfo) -> SecretStr:
+        if info.data.get("api_require_auth") and not fullmatch(
+            BEARER_TOKEN_PATTERN, value.get_secret_value()
+        ):
+            raise ValueError("Configurá API_ACCESS_TOKEN con un token Bearer válido.")
         return value
 
     @field_validator("extractor_url", "document_service_url")

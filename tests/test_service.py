@@ -14,6 +14,7 @@ from app.config import Settings
 PDF = b"%PDF-1.4\nexample"
 EXTRACTOR = "http://extractor:8000"
 DOCUMENTS = "http://documents:8000"
+API_TOKEN = "fake-process-client-token-only-12345"
 
 
 def install_settings(monkeypatch, **kwargs):
@@ -76,12 +77,21 @@ def test_existing_skips_extractor(client):
     assert not extractor.calls
 
 
-def test_documents_bearer_new_and_repeated_pdf(monkeypatch):
+@pytest.mark.parametrize("multipart", [False, True])
+def test_separate_bearer_tokens_for_new_and_repeated_pdf(monkeypatch, multipart):
     token = "fake-documents-test-token-only-12345"
     monkeypatch.setenv("DOCUMENTS_API_TOKEN", token)
+    monkeypatch.setenv("API_REQUIRE_AUTH", "true")
+    monkeypatch.setenv("API_ACCESS_TOKEN", API_TOKEN)
     config = Settings(_env_file=None)
     assert token not in repr(config)
-    install_settings(monkeypatch, documents_api_token=config.documents_api_token)
+    assert API_TOKEN not in repr(config)
+    install_settings(
+        monkeypatch,
+        documents_api_token=config.documents_api_token,
+        api_require_auth=config.api_require_auth,
+        api_access_token=config.api_access_token,
+    )
     checksum = calculate_checksum(PDF)
     with (
         TestClient(main.app) as client,
@@ -97,14 +107,14 @@ def test_documents_bearer_new_and_repeated_pdf(monkeypatch):
         extract = extractor.post("/extract").mock(
             return_value=httpx.Response(200, json={"content": "# text", "page_count": 1}),
         )
-        headers = {
-            "Content-Type": "application/pdf",
-            "Authorization": "Bearer incoming-client-token",
-            "X-Request-ID": "documents-auth-test",
-        }
-        assert client.get("/ready", headers=headers).status_code == 200
-        first = client.post("/process", content=PDF, headers=headers)
-        repeated = client.post("/process", content=PDF, headers=headers)
+        headers = {"Authorization": f"bEaReR  {API_TOKEN}", "X-Request-ID": "documents-auth-test"}
+        assert client.get("/health").status_code == 200
+        assert client.get("/ready").status_code == 200
+        if multipart:
+            first = client.post("/process", files={"file": ("document.pdf", PDF, "application/pdf")}, headers=headers)
+        else:
+            first = client.post("/process", content=PDF, headers={**headers, "Content-Type": "application/pdf"})
+        repeated = client.post("/process", content=PDF, headers={**headers, "Content-Type": "application/pdf"})
 
     assert first.status_code == repeated.status_code == 200
     assert first.json()["source"] == "extracted"
@@ -118,6 +128,47 @@ def test_documents_bearer_new_and_repeated_pdf(monkeypatch):
         assert call.request.headers["x-request-id"] == "documents-auth-test"
     for route in (documents_ready, extractor_ready, extract):
         assert "authorization" not in route.calls.last.request.headers
+
+
+@pytest.mark.parametrize("authorization", [
+    pytest.param([], id="missing"),
+    pytest.param(["Bearer fake-process-client-token-only-54321"], id="incorrect"),
+    pytest.param([f"Bearer {API_TOKEN}", f"Bearer {API_TOKEN}"], id="duplicate"),
+    pytest.param([f"Bearer {API_TOKEN}, Bearer {API_TOKEN}"], id="combined"),
+    pytest.param([f"Basic {API_TOKEN}"], id="wrong-scheme"),
+    pytest.param(["Bearer"], id="missing-token"),
+    pytest.param([b"Bearer \xff"], id="non-ascii"),
+])
+async def test_process_auth_rejects_before_admission_or_body(monkeypatch, caplog, authorization):
+    monkeypatch.setenv("API_REQUIRE_AUTH", "true")
+    monkeypatch.setenv("API_ACCESS_TOKEN", API_TOKEN)
+    config = Settings(_env_file=None)
+    install_settings(
+        monkeypatch, api_require_auth=True, api_access_token=config.api_access_token,
+        max_concurrent_requests=1,
+    )
+
+    async def body():
+        pytest.fail("El cuerpo de un pedido sin autorización no debe leerse")
+        yield PDF
+
+    headers = [("Content-Type", "application/pdf"), *[("Authorization", value) for value in authorization]]
+    async with main.lifespan(main.app):
+        # A rejected request must never acquire the admission lock.
+        monkeypatch.setattr(main.app.state, "active_lock", None)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=main.app), base_url="http://api",
+        ) as client:
+            with respx.mock(assert_all_called=False) as upstream:
+                response = await client.post("/process", headers=headers, content=body())
+            assert not upstream.calls
+        assert main.app.state.active_requests == 0
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert response.json() == {"error": "unauthorized", "detail": "Se requiere un token Bearer válido."}
+    assert API_TOKEN not in response.text + caplog.text
+    assert "fake-process-client-token-only-54321" not in response.text + caplog.text
 
 
 def test_documents_unauthorized_stops_processing(client, caplog):

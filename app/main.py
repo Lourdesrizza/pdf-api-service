@@ -3,6 +3,7 @@ import logging
 import sys
 import uuid
 from contextlib import asynccontextmanager
+from hmac import compare_digest
 
 import httpx
 from fastapi import FastAPI, Request
@@ -46,13 +47,26 @@ PROCESS_OPENAPI_EXTRA = {
 }
 PROCESS_ERROR_RESPONSES = {
     status: {"model": ErrorResponse}
-    for status in (400, 408, 413, 415, 422, 500, 502, 503, 504)
+    for status in (400, 401, 408, 413, 415, 422, 500, 502, 503, 504)
 }
 
 
 def _is_valid_request_id(value: str) -> bool:
     return bool(value) and len(value) <= 128 and value.isascii() and all(
         32 <= ord(character) < 127 for character in value
+    )
+
+
+def _has_valid_process_token(request: Request) -> bool:
+    authorization = request.headers.getlist("authorization")
+    if len(authorization) != 1:
+        return False
+    scheme, _, token = authorization[0].partition(" ")
+    token = token.lstrip(" ")
+    return (
+        scheme.lower() == "bearer"
+        and token.isascii()
+        and compare_digest(settings.api_access_token.get_secret_value(), token)
     )
 
 
@@ -142,6 +156,14 @@ async def ready(request: Request):
     responses=PROCESS_ERROR_RESPONSES,
 )
 async def process(request: Request):
+    if settings.api_require_auth and not _has_valid_process_token(request):
+        raise APIError(
+            401,
+            "unauthorized",
+            "Se requiere un token Bearer válido.",
+            {"WWW-Authenticate": "Bearer"},
+        )
+
     limit = settings.max_concurrent_requests
     if limit > 0:
         async with request.app.state.active_lock:
