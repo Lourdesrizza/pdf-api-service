@@ -11,6 +11,7 @@ from app.clients.documents import DocumentClient
 from app.clients.extractor import ExtractorClient
 from app.config import Settings
 from app.errors import APIError
+from app.routes import process
 from app.validation import parse_multipart, receive_pdf
 
 
@@ -121,11 +122,11 @@ async def test_admission_released(monkeypatch, mode):
         main.app.state.orchestrator = Orchestrator()
         request = request_for(receive)
         request.scope["app"] = main.app
-        task = asyncio.create_task(main.process(request))
+        task = asyncio.create_task(process(request))
         await entered.wait()
         if mode in ("timeout", "cancel"):
             with pytest.raises(APIError) as saturated:
-                await main.process(request)
+                await process(request)
             assert saturated.value.status_code == 503
             assert saturated.value.headers["Retry-After"] == "1"
         if mode == "cancel":

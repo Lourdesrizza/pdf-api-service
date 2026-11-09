@@ -28,6 +28,18 @@ sequenceDiagram
 
 El Document Service responde 201 cuando guarda un documento nuevo y 200 cuando el checksum ya estaba guardado. Si el POST de creación devuelve 409 por una carrera, la API vuelve a consultar por checksum y devuelve el documento existente.
 
+## Organización de la API
+
+| Módulo | Responsabilidad |
+|---|---|
+| `app/main.py` | Crea la aplicación y conecta configuración, middleware, rutas y ciclo de vida. |
+| `app/routes.py` | Define `/process`, `/health` y `/ready`. Aplica el límite de concurrencia en `/process`. |
+| `app/auth.py` | Valida la credencial Bearer que presenta el cliente de `/process`. |
+| `app/middleware.py` | Correlaciona solicitudes con `X-Request-ID` y procesa errores inesperados. |
+| `app/lifecycle.py` | Prepara el cliente HTTP compartido y las dependencias al arrancar. Cierra el cliente al apagar. |
+| `app/services/orchestrator.py` | Decide si reutilizar un documento o coordinar extracción y guardado. |
+| `app/clients/` | Encapsula las llamadas HTTP y la resiliencia de Documents y Extractor. |
+
 ## Endpoints
 
 - `POST /process`: acepta `application/pdf` binario o `multipart/form-data` con campo `file`. En binario puede enviarse `X-Filename`; si el nombre no termina en `.pdf` se usa `document.pdf`.
