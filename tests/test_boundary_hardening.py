@@ -11,8 +11,16 @@ from app.clients.documents import DocumentClient
 from app.clients.extractor import ExtractorClient
 from app.config import Settings
 from app.errors import APIError
-from app.routes import process
+from app.routers.process import process
 from app.validation import parse_multipart, receive_pdf
+
+
+def test_default_upstreams_use_ingress(monkeypatch):
+    monkeypatch.delenv("EXTRACTOR_URL", raising=False)
+    monkeypatch.delenv("DOCUMENT_SERVICE_URL", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.extractor_url == "http://extractor.universidad.localhost"
+    assert settings.document_service_url == "http://documents.universidad.localhost"
 
 
 @pytest.mark.parametrize("field,value", [

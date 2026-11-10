@@ -5,7 +5,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from app.clients import circuit, documents as documents_module
+from app.clients import base, circuit
 from app.clients.documents import DocumentClient
 from app.clients.extractor import ExtractorClient
 from app.errors import APIError
@@ -30,12 +30,12 @@ def clock(monkeypatch):
 @pytest.fixture
 def retry_sleep(monkeypatch):
     sleep = AsyncMock()
-    monkeypatch.setattr(documents_module, "sleep", sleep)
+    monkeypatch.setattr(base, "sleep", sleep)
     return sleep
 
 
 @pytest.mark.parametrize("down", ["documents", "extractor"])
-async def test_circuits_are_independent_and_posts_are_not_retried(down, clock):
+async def test_circuits_are_independent_and_documents_save_is_not_retried(down, clock, retry_sleep):
     calls = []
 
     def respond(request):
@@ -62,11 +62,12 @@ async def test_circuits_are_independent_and_posts_are_not_retried(down, clock):
             return await extractor.extract(b"%PDF-")
 
         broken, healthy = (save, extract) if down == "documents" else (extract, save)
+        attempts = 1 if down == "documents" else 3
         for count in range(1, 4):
             with pytest.raises(APIError) as failed:
                 await broken()
             assert failed.value.status_code == 502
-            assert len(calls) == count
+            assert len(calls) == count * attempts
             assert calls[-1][:2] == (down, "POST")
 
         for _ in range(2):
@@ -79,7 +80,7 @@ async def test_circuits_are_independent_and_posts_are_not_retried(down, clock):
             with pytest.raises(APIError) as rejected_lookup:
                 await documents.find_by_checksum(CHECKSUM)
             assert rejected_lookup.value.status_code == 503
-        assert len(calls) == 3
+        assert len(calls) == 3 * attempts
 
         assert await healthy()
         assert calls[-1][0] != down
@@ -88,7 +89,7 @@ async def test_circuits_are_independent_and_posts_are_not_retried(down, clock):
         with pytest.raises(APIError) as still_open:
             await broken()
         assert still_open.value.status_code == 503
-        assert len(calls) == 5
+        assert len(calls) == 3 * attempts + 2
 
 
 async def test_lookup_counts_final_failure_once_and_probe_can_fail_or_recover(clock, retry_sleep):
@@ -102,36 +103,36 @@ async def test_lookup_counts_final_failure_once_and_probe_can_fail_or_recover(cl
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
         documents = DocumentClient(http, "http://documents")
-        for count in (2, 4, 6):
+        for count in (3, 6, 9):
             with pytest.raises(APIError) as failed:
                 await documents.find_by_checksum(CHECKSUM)
             assert failed.value.headers == {"Retry-After": "1"}
             assert calls == count
-        assert retry_sleep.await_count == 3
+        assert retry_sleep.await_count == 6
 
         clock(9)
         with pytest.raises(APIError) as rejected:
             await documents.find_by_checksum(CHECKSUM)
         assert rejected.value.headers == {"Retry-After": "1"}
-        assert calls == 6
+        assert calls == 9
 
         clock(1)
         with pytest.raises(APIError) as failed_probe:
             await documents.find_by_checksum(CHECKSUM)
         assert failed_probe.value.headers == {"Retry-After": "1"}
-        assert calls == 7
-        assert retry_sleep.await_count == 3
+        assert calls == 10
+        assert retry_sleep.await_count == 6
 
         with pytest.raises(APIError) as reopened:
             await documents.find_by_checksum(CHECKSUM)
         assert reopened.value.headers == {"Retry-After": "10"}
-        assert calls == 7
+        assert calls == 10
 
         clock(10)
         status = 404
         assert await documents.find_by_checksum(CHECKSUM) is None
         assert await documents.find_by_checksum(CHECKSUM) is None
-        assert calls == 9
+        assert calls == 12
 
 
 async def test_only_one_probe_and_cancelled_probe_releases_slot(clock):
@@ -143,10 +144,12 @@ async def test_only_one_probe_and_cancelled_probe_releases_slot(clock):
         nonlocal calls
         calls += 1
         if calls <= 3:
-            return httpx.Response(500)
+            return httpx.Response(503, headers={"Retry-After": "1"})
         if calls == 4:
             entered.set()
             await release.wait()
+        if calls == 5:
+            return httpx.Response(502)
         return httpx.Response(200, json={"content": "text", "page_count": 1})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
@@ -173,9 +176,15 @@ async def test_only_one_probe_and_cancelled_probe_releases_slot(clock):
         assert reopened.value.headers == {"Retry-After": "10"}
         assert calls == 4
         clock(10)
+        with pytest.raises(APIError) as failed_probe:
+            await extractor.extract(b"%PDF-")
+        assert failed_probe.value.status_code == 502
+        assert calls == 5
+
+        clock(10)
         assert await extractor.extract(b"%PDF-") == ("text", 1)
         assert await extractor.extract(b"%PDF-") == ("text", 1)
-        assert calls == 6
+        assert calls == 7
 
 
 async def test_late_success_from_before_opening_does_not_close_circuit(clock):
@@ -190,7 +199,7 @@ async def test_late_success_from_before_opening_does_not_close_circuit(clock):
             entered.set()
             await release.wait()
             return httpx.Response(200, json={"content": "text", "page_count": 1})
-        return httpx.Response(500)
+        return httpx.Response(502, headers={"Retry-After": "1"})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
         extractor = ExtractorClient(http, "http://extractor")
@@ -257,7 +266,7 @@ async def test_lookup_does_not_retry_noneligible_responses(status, headers, mapp
     retry_sleep.assert_not_awaited()
 
 
-async def test_lookup_deadline_includes_both_attempts_and_pause(monkeypatch):
+async def test_lookup_deadline_includes_attempts_and_pause(monkeypatch):
     loop = asyncio.get_running_loop()
     now = loop.time()
     calls = 0
@@ -281,9 +290,57 @@ async def test_lookup_deadline_includes_both_attempts_and_pause(monkeypatch):
         documents = DocumentClient(http, "http://documents", timeout=1)
         with monkeypatch.context() as patch:
             patch.setattr(loop, "time", lambda: now)
-            patch.setattr(documents_module, "sleep", pause)
+            patch.setattr(base, "sleep", pause)
             with pytest.raises(APIError) as failed:
                 await documents.find_by_checksum(CHECKSUM)
 
     assert failed.value.status_code == 504
     assert calls == 2
+
+
+@pytest.mark.parametrize("service", ["documents", "extractor"])
+@pytest.mark.parametrize("recovers", [True, False])
+async def test_backoff_recovers_or_stops_after_three_attempts(service, recovers, retry_sleep):
+    result = DOCUMENT if service == "documents" else {"content": "text", "page_count": 1}
+    respond = AsyncMock(side_effect=[
+        httpx.ConnectError("transient"),
+        httpx.Response(502),
+        httpx.Response(200, json=result) if recovers else httpx.Response(503),
+    ])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        if service == "documents":
+            async def operation():
+                return (await DocumentClient(http, "http://documents").find_by_checksum(CHECKSUM)).id
+            expected = DOCUMENT["id"]
+        else:
+            async def operation():
+                return await ExtractorClient(http, "http://extractor").extract(b"%PDF-")
+            expected = ("text", 1)
+
+        if recovers:
+            assert await operation() == expected
+        else:
+            with pytest.raises(APIError) as failed:
+                await operation()
+            assert failed.value.status_code == 503
+            assert failed.value.headers == {"Retry-After": "1"}
+
+    assert respond.await_count == 3
+    assert [call.args[0] for call in retry_sleep.await_args_list] == [0.05, 0.10]
+
+
+async def test_save_does_not_replay_after_losing_response(retry_sleep):
+    respond = AsyncMock(side_effect=[httpx.ReadError("response lost"), httpx.Response(200, json=DOCUMENT)])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        documents = DocumentClient(http, "http://documents")
+        with pytest.raises(APIError) as failed:
+            await documents.create(
+                checksum=CHECKSUM, filename="test.pdf", content="text", page_count=1,
+            )
+        assert failed.value.status_code == 502
+        assert (await documents.find_by_checksum(CHECKSUM)).id == DOCUMENT["id"]
+
+    assert [call.args[0].method for call in respond.await_args_list] == ["POST", "GET"]
+    retry_sleep.assert_not_awaited()

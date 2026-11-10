@@ -2,7 +2,8 @@ from typing import Literal, Protocol
 
 from app.checksum import calculate_checksum
 from app.errors import APIError
-from app.schemas import DocumentCreation, DocumentPayload, ProcessResponse
+from app.schemas.responses import ProcessResponse
+from app.schemas.upstream import DocumentCreation, DocumentPayload
 
 
 class DocumentsGateway(Protocol):

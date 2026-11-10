@@ -1,13 +1,10 @@
-"""HTTP routes for processing PDFs and probing service health."""
-
-import asyncio
+"""HTTP route for processing PDFs."""
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 
 from app.auth import require_process_auth
 from app.errors import APIError
-from app.schemas import ErrorResponse, ProcessResponse
+from app.schemas.responses import ErrorResponse, ProcessResponse
 from app.validation import receive_pdf
 
 router = APIRouter()
@@ -35,33 +32,6 @@ PROCESS_ERROR_RESPONSES = {
     status: {"model": ErrorResponse}
     for status in (400, 401, 408, 413, 415, 422, 500, 502, 503, 504)
 }
-
-
-@router.get("/health")
-async def health():
-    return {"status": "ok", "service": "api"}
-
-
-@router.get("/ready", responses={503: {"model": ErrorResponse}})
-async def ready(request: Request):
-    timeout = request.app.state.settings.ready_check_timeout_seconds
-    extractor_ok, documents_ok = await asyncio.gather(
-        request.app.state.extractor.health(timeout),
-        request.app.state.documents.health(timeout),
-    )
-    if extractor_ok and documents_ok:
-        return {"status": "ready", "dependencies": {"extractor": "ok", "documents": "ok"}}
-    return JSONResponse(
-        status_code=503,
-        content={
-            "error": "not_ready",
-            "detail": "Uno o más servicios requeridos no están disponibles.",
-            "dependencies": {
-                "extractor": "ok" if extractor_ok else "unavailable",
-                "documents": "ok" if documents_ok else "unavailable",
-            },
-        },
-    )
 
 
 @router.post(

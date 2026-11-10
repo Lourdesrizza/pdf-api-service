@@ -1,19 +1,20 @@
 """HTTP client for the Documents service contract."""
 
-from asyncio import sleep, timeout
-
 import httpx
 from pydantic import SecretStr
 
-from app.clients.base import UpstreamFailure, correlation_headers, map_transport_error, map_upstream_status
+from app.clients.base import (
+    UpstreamFailure,
+    correlation_headers,
+    map_transport_error,
+    map_upstream_status,
+    request_with_backoff,
+)
 from app.clients.circuit import CircuitBreaker
-from app.schemas import DocumentCreation, DocumentPayload
+from app.schemas.upstream import DocumentCreation, DocumentPayload
 
 
 SERVICE = "document service"
-CHECKSUM_RETRY_DELAY_SECONDS = 0.05
-CHECKSUM_RETRY_STATUSES = {408, 500, 502, 503, 504}
-CHECKSUM_RETRY_ERRORS = (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError)
 
 
 class DocumentClient:
@@ -57,23 +58,15 @@ class DocumentClient:
             return self._parse(response, checksum)
 
     async def _get_checksum(self, checksum: str, *, allow_retry: bool) -> httpx.Response:
-        url = f"{self.base_url}/documents/by-checksum/{checksum}"
-        headers = self._document_headers()
         try:
-            async with timeout(self.timeout):
-                if allow_retry:
-                    try:
-                        response = await self.http.get(url, headers=headers, timeout=self.timeout)
-                    except CHECKSUM_RETRY_ERRORS:
-                        pass
-                    else:
-                        if (
-                            response.status_code not in CHECKSUM_RETRY_STATUSES
-                            or "Retry-After" in response.headers
-                        ):
-                            return response
-                    await sleep(CHECKSUM_RETRY_DELAY_SECONDS)
-                return await self.http.get(url, headers=headers, timeout=self.timeout)
+            return await request_with_backoff(
+                self.http,
+                "GET",
+                f"{self.base_url}/documents/by-checksum/{checksum}",
+                headers=self._document_headers(),
+                timeout_seconds=self.timeout,
+                allow_retry=allow_retry,
+            )
         except (httpx.RequestError, TimeoutError) as exc:
             raise map_transport_error(exc, SERVICE) from exc
 
@@ -92,6 +85,7 @@ class DocumentClient:
             "page_count": page_count,
         }
         with self._circuit.operation():
+            # A lost response can hide a successful write and change the observed 201 to 200.
             try:
                 response = await self.http.post(
                     f"{self.base_url}/documents",
