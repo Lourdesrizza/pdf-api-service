@@ -33,9 +33,9 @@ El Document Service responde 201 cuando guarda un documento nuevo y 200 cuando e
 | Módulo | Responsabilidad |
 |---|---|
 | `app/main.py` | Crea la aplicación y conecta configuración, middleware, rutas y ciclo de vida. |
-| `app/routers/` | Define `/process` en `process.py` y las sondas `/health` y `/ready` en `health.py`. |
+| `app/routers/` | Define `/process`, las sondas `/health` y `/ready`, y la ruta de monitoreo `/metrics`. |
 | `app/schemas/` | Separa los modelos Pydantic de la API pública (`responses.py`) de los contratos de dependencias (`upstream.py`). |
-| `app/auth.py` | Valida la credencial Bearer que presenta el cliente de `/process`. |
+| `app/auth.py` | Valida las credenciales Bearer de `/process` y `/metrics`. |
 | `app/middleware.py` | Correlaciona solicitudes con `X-Request-ID` y procesa errores inesperados. |
 | `app/lifecycle.py` | Prepara el cliente HTTP compartido y las dependencias al arrancar. Cierra el cliente al apagar. |
 | `app/services/orchestrator.py` | Decide si reutilizar un documento o coordinar extracción y guardado. |
@@ -46,6 +46,7 @@ El Document Service responde 201 cuando guarda un documento nuevo y 200 cuando e
 - `POST /process`: acepta `application/pdf` binario o `multipart/form-data` con campo `file`. En binario puede enviarse `X-Filename`; si el nombre no termina en `.pdf` se usa `document.pdf`.
 - `GET /health`: liveness, sin consultar dependencias.
 - `GET /ready`: consulta `/health/ready` de extractor y Document Service.
+- `GET /metrics`: expone métricas de `POST /process` para Prometheus cuando se configura `METRICS_API_TOKEN`.
 - `/docs` y `/openapi.json`: contrato interactivo.
 
 Ejemplos PowerShell:
@@ -78,6 +79,7 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 | `DOCUMENTS_API_TOKEN` | Vacío para fakes y revisiones históricas | Secreto compartido obligatorio al usar Documents con Bearer |
 | `API_REQUIRE_AUTH` | `false` | Exige autenticación Bearer en `POST /process` cuando es `true` |
 | `API_ACCESS_TOKEN` | Vacío | Credencial del cliente para `POST /process`, obligatoria en modo restringido |
+| `METRICS_API_TOKEN` | Vacío | Token Bearer independiente para habilitar y proteger `GET /metrics`. Usar al menos 32 caracteres válidos |
 | `PORT` | `8000` | Puerto HTTP |
 | `MAX_UPLOAD_BYTES` | `20971520` | Máximo de carga, 20 MiB |
 | `EXTRACTOR_TIMEOUT_SECONDS` | `30` | Timeout de extracción |
@@ -94,6 +96,33 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 El Compose principal y su override dev usan las URLs de Ingress por defecto.
 El Compose de pruebas fija `fake-extractor:8000` y `fake-documents:8000`.
 La integración real aislada fija `extractor:8000` y `documents:8000` en su propia red.
+
+### Monitoreo con Prometheus
+
+`/metrics` devuelve 404 con `METRICS_API_TOKEN` vacío. Con un token configurado,
+devuelve 401 si falta una credencial válida. El contador
+`pdf_api_process_requests_total` agrupa las respuestas de `POST /process` por
+código HTTP. El histograma `pdf_api_process_duration_seconds` mide el tiempo
+hasta que la API prepara la respuesta. Las métricas son por proceso y excluyen
+los nombres de archivo, el contenido de los PDFs y los tokens.
+
+En el Compose compartido de infraestructura, pasar `METRICS_API_TOKEN` al
+contenedor `api` y montar el mismo secreto como archivo de solo lectura en
+Prometheus. Habilitar el job `pdf-api` en `scrape_configs` con este formato:
+
+```yaml
+- job_name: pdf-api
+  metrics_path: /metrics
+  authorization:
+    type: Bearer
+    credentials_file: /run/secrets/pdf_api_metrics_token
+  static_configs:
+    - targets: ['api:8000']
+```
+
+El job usa la red Docker compartida. Después de reconstruir la API y recargar
+Prometheus, verificar que `up{job="pdf-api"}` valga 1 y que el contador aumente
+al enviar un PDF.
 
 Con Documents autenticado, inyectar el mismo `DOCUMENTS_API_TOKEN` en ambos
 contenedores desde el entorno o el gestor de secretos. El Compose compartido
