@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.clients.documents import DocumentClient
 from app.clients.extractor import ExtractorClient
+from app.metrics import ProcessMetrics
 from app.services.orchestrator import Orchestrator
 
 
@@ -38,4 +39,7 @@ async def lifespan(app: FastAPI):
         app.state.documents = documents
         app.state.active_requests = 0
         app.state.active_lock = asyncio.Lock()
+        app.state.process_metrics = (
+            ProcessMetrics() if settings.metrics_api_token.get_secret_value() else None
+        )
         yield

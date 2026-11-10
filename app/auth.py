@@ -1,4 +1,4 @@
-"""Bearer authentication for the processing endpoint."""
+"""Bearer authentication for API endpoints."""
 
 from hmac import compare_digest
 
@@ -8,7 +8,7 @@ from app.config import Settings
 from app.errors import APIError
 
 
-def _has_valid_process_token(request: Request, expected_token: str) -> bool:
+def _has_valid_bearer_token(request: Request, expected_token: str) -> bool:
     authorization = request.headers.getlist("authorization")
     if len(authorization) != 1:
         return False
@@ -21,13 +21,16 @@ def _has_valid_process_token(request: Request, expected_token: str) -> bool:
     )
 
 
-def require_process_auth(request: Request, settings: Settings) -> None:
-    if settings.api_require_auth and not _has_valid_process_token(
-        request, settings.api_access_token.get_secret_value(),
-    ):
+def require_bearer_token(request: Request, expected_token: str) -> None:
+    if not _has_valid_bearer_token(request, expected_token):
         raise APIError(
             401,
             "unauthorized",
             "Se requiere un token Bearer válido.",
             {"WWW-Authenticate": "Bearer"},
         )
+
+
+def require_process_auth(request: Request, settings: Settings) -> None:
+    if settings.api_require_auth:
+        require_bearer_token(request, settings.api_access_token.get_secret_value())

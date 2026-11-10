@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     documents_api_token: SecretStr = SecretStr("")
     api_require_auth: bool = False
     api_access_token: SecretStr = SecretStr("")
+    metrics_api_token: SecretStr = SecretStr("")
     port: int = Field(default=8000, ge=1, le=65535)
     max_upload_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
     extractor_timeout_seconds: float = Field(default=30, gt=0, allow_inf_nan=False)
@@ -33,6 +34,14 @@ class Settings(BaseSettings):
         token = value.get_secret_value()
         if token and not fullmatch(BEARER_TOKEN_PATTERN, token):
             raise ValueError("DOCUMENTS_API_TOKEN no tiene un formato Bearer válido")
+        return value
+
+    @field_validator("metrics_api_token")
+    @classmethod
+    def validate_metrics_api_token(cls, value: SecretStr) -> SecretStr:
+        token = value.get_secret_value()
+        if token and not fullmatch(BEARER_TOKEN_PATTERN, token):
+            raise ValueError("METRICS_API_TOKEN no tiene un formato Bearer válido")
         return value
 
     @field_validator("api_access_token")
