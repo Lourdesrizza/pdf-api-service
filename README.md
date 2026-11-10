@@ -33,7 +33,8 @@ El Document Service responde 201 cuando guarda un documento nuevo y 200 cuando e
 | Módulo | Responsabilidad |
 |---|---|
 | `app/main.py` | Crea la aplicación y conecta configuración, middleware, rutas y ciclo de vida. |
-| `app/routes.py` | Define `/process`, `/health` y `/ready`. Aplica el límite de concurrencia en `/process`. |
+| `app/routers/` | Define `/process` en `process.py` y las sondas `/health` y `/ready` en `health.py`. |
+| `app/schemas/` | Separa los modelos Pydantic de la API pública (`responses.py`) de los contratos de dependencias (`upstream.py`). |
 | `app/auth.py` | Valida la credencial Bearer que presenta el cliente de `/process`. |
 | `app/middleware.py` | Correlaciona solicitudes con `X-Request-ID` y procesa errores inesperados. |
 | `app/lifecycle.py` | Prepara el cliente HTTP compartido y las dependencias al arrancar. Cierra el cliente al apagar. |
@@ -72,8 +73,8 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 
 | Variable | Default | Uso |
 |---|---:|---|
-| `EXTRACTOR_URL` | `http://extractor:8000` | URL base del extractor |
-| `DOCUMENT_SERVICE_URL` | `http://documents:8000` | URL base de documentos |
+| `EXTRACTOR_URL` | `http://extractor.universidad.localhost` | URL base del extractor |
+| `DOCUMENT_SERVICE_URL` | `http://documents.universidad.localhost` | URL base de documentos |
 | `DOCUMENTS_API_TOKEN` | Vacío para fakes y revisiones históricas | Secreto compartido obligatorio al usar Documents con Bearer |
 | `API_REQUIRE_AUTH` | `false` | Exige autenticación Bearer en `POST /process` cuando es `true` |
 | `API_ACCESS_TOKEN` | Vacío | Credencial del cliente para `POST /process`, obligatoria en modo restringido |
@@ -83,14 +84,16 @@ Copiar `.env.example` a `.env` para desarrollo y ajustar valores. No versionar `
 | `DOCUMENT_TIMEOUT_SECONDS` | `5` | Timeout de llamadas a documentos |
 | `READY_CHECK_TIMEOUT_SECONDS` | `2` | Timeout por health check |
 | `BODY_TIMEOUT_SECONDS` | `30` | Plazo total finito para recibir el cuerpo; vence con 408 |
-| `MAX_CONCURRENT_REQUESTS` | `2` en Compose; `0` en Python local | Admisión inmediata; cero desactiva el límite |
+| `MAX_CONCURRENT_REQUESTS` | `2` en Compose, `0` en Python local | Contrapresión por proceso. Cero desactiva el límite |
 | `LOG_LEVEL` | `INFO` | Nivel de logs a stdout |
 | `TRAEFIK_API_HOST` | `api.universidad.localhost` | Host del router Traefik |
 | `TRAEFIK_ENTRYPOINT` | `web` | Entrypoint HTTP confirmado |
 | `TRAEFIK_TLS` | `false` | Habilitar solo con TLS configurado en Traefik |
 | `DEV_PORT` | `8002` | Puerto publicado en 127.0.0.1 por el override dev |
 
-Dentro de Docker, usar DNS de servicio (`extractor`, `documents`), nunca `localhost`.
+El Compose principal y su override dev usan las URLs de Ingress por defecto.
+El Compose de pruebas fija `fake-extractor:8000` y `fake-documents:8000`.
+La integración real aislada fija `extractor:8000` y `documents:8000` en su propia red.
 
 Con Documents autenticado, inyectar el mismo `DOCUMENTS_API_TOKEN` en ambos
 contenedores desde el entorno o el gestor de secretos. El Compose compartido
@@ -167,6 +170,69 @@ docker compose build
 
 `pdf-network` debe existir como red externa y el Traefik de `pdf-infrastructure` debe estar conectado a ella. Los labels usan `web` por HTTP y TLS desactivado, con router/service explícitos y `traefik.docker.network=pdf-network`. El arranque compartido corresponde al coordinador; no queda certificado por la prueba aislada. El compose fija límites de 1 CPU y 512 MiB; no configura `container_name`, por lo que permite réplicas.
 
+### Validación de Ingress compartido con Jere
+
+En el Compose de `pdf-infrastructure`, Jere debe configurar o actualizar las
+variables que se inyectan al contenedor `api`.
+
+```dotenv
+EXTRACTOR_URL=http://extractor.universidad.localhost
+DOCUMENT_SERVICE_URL=http://documents.universidad.localhost
+```
+
+Ambos nombres deben resolver a **Traefik** desde la API. En Docker se pueden
+configurar como alias del servicio Traefik en `pdf-network`. Verificá que las
+reglas `Host` de esos nombres enruten a los dos servicios reales en el
+entrypoint HTTP `web`. Si se usa un proxy HTTP en el contenedor, excluí ambos
+nombres con `NO_PROXY`.
+
+Con el stack compartido levantado, desde el directorio del Compose de
+infraestructura, ejecutá este probe en el contenedor de la API.
+
+```powershell
+@'
+import os
+import socket
+from urllib.parse import urlsplit
+
+import httpx
+
+for name, expected in (
+    ("EXTRACTOR_URL", "http://extractor.universidad.localhost"),
+    ("DOCUMENT_SERVICE_URL", "http://documents.universidad.localhost"),
+):
+    url = os.environ[name]
+    assert url == expected, (name, url)
+    addresses = {info[4][0] for info in socket.getaddrinfo(urlsplit(url).hostname, 80)}
+    response = httpx.get(f"{url}/health/ready", timeout=5)
+    print(name, sorted(addresses), response.status_code)
+    assert response.status_code == 200
+'@ | docker compose exec -T api python -
+```
+
+Contrastá las IP impresas con las de Traefik en `pdf-network` mediante
+`docker network inspect pdf-network`. Revisá también que el access log de
+Traefik registre las dos solicitudes con sus routers respectivos. Después,
+desde el host, verificá el flujo público con un PDF cuyo checksum todavía no
+exista en el entorno. Si el modo restringido está habilitado, enviá el Bearer
+de la API en los POST.
+
+```powershell
+$baseUrl = 'http://api.universidad.localhost'
+$pdf = './pdf-de-prueba-nuevo.pdf'
+curl.exe --fail-with-body -i "$baseUrl/ready"
+$first = Invoke-RestMethod -Method Post -Uri "$baseUrl/process" `
+  -ContentType 'application/pdf' -InFile $pdf
+$second = Invoke-RestMethod -Method Post -Uri "$baseUrl/process" `
+  -ContentType 'application/pdf' -InFile $pdf
+$first, $second | Select-Object source, document_id, checksum
+```
+
+`/ready` debe devolver 200 con ambas dependencias en `ok`. Los dos POST deben
+devolver 200, primero con `source=extracted` y luego con `source=existing`,
+con el mismo ID y checksum. Registrá los resultados junto con los commits o
+imágenes desplegados. La validación compartida con estas URLs queda pendiente.
+
 ### Pruebas aisladas con fakes
 
 Stack propio, separado de servicios reales. Dev y test publican 8002: usar uno por vez.
@@ -227,7 +293,7 @@ El runbook de [`integration/real-stack`](integration/real-stack/README.md) ejecu
 
 ## Cierre de frontera y ciclo de vida (04/11/2026)
 
-Pydantic v2 valida PORT 1..65535, tamaño positivo, timeouts positivos finitos, concurrencia no negativa y URLs HTTP/HTTPS con host. Se admite localhost fuera de Docker; dentro de Docker usar DNS de servicio. No se aceptan credenciales, query ni fragmentos en URLs base.
+Pydantic v2 valida PORT 1..65535, tamaño positivo, timeouts positivos finitos, concurrencia no negativa y URLs HTTP/HTTPS con host. No se aceptan credenciales, query ni fragmentos en URLs base.
 
 El máximo predeterminado de **20 MiB (20.971.520 bytes) cuenta todo el cuerpo HTTP**, incluido el envoltorio multipart: un PDF binario de exactamente ese tamaño cabe; el mismo PDF dentro de multipart excede el límite. Content-Length inválido o excesivo se rechaza antes de leer; el conteo real por chunks sigue activo aunque falte o subestime el tamaño. BODY_TIMEOUT_SECONDS cuenta toda la recepción, sin reiniciarse por chunk. El 408 devuelve `{"error":"body_timeout","detail":"Se agotó el tiempo para recibir el cuerpo."}`.
 
@@ -235,8 +301,8 @@ Multipart admite una única parte `file`, sin campos adicionales, partes anidada
 
 Extractor solo tiene éxito con 200; consulta Documents con 200 o 404; creación Documents con 201/200 y 409 excepcional para reconsulta. Documents 413 se conserva como **API 502**: describe un resultado upstream que no puede persistirse, no un exceso del cuerpo PDF recibido. El máximo BSON y el tamaño del Markdown no equivalen al límite de carga. Hay regresión de esta decisión y comprobación directa contra Documents actual.
 
-Compose concede 30 s de apagado y Uvicorn espera hasta 20 s por solicitudes pendientes; `init: true` reenvía señales. Una petición que excede ese margen puede cancelarse. El cliente HTTP compartido se cierra mediante lifespan. Se conserva el contador con lock y liberación en finally ante éxito, error y cancelación. La saturación responde inmediatamente 503 con Retry-After: 1. /health no llama servicios remotos. No se añadieron señales propias ni readiness de drenado: el servidor real deja de aceptar conexiones durante shutdown.
+Compose concede 30 s de apagado y Uvicorn espera hasta 20 s por solicitudes pendientes. `init: true` reenvía señales. Una petición que excede ese margen puede cancelarse. El cliente HTTP compartido se cierra mediante lifespan. El cupo se libera en `finally` ante éxito, error o cancelación.
 
-Compose usa `MAX_CONCURRENT_REQUESTS=2` para acotar cuántas solicitudes retienen a la vez el PDF y los datos de procesamiento en memoria. Con 1 CPU, 512 MiB y dos solicitudes concurrentes, la corrida registró un pico de 255,13 MiB. La medición respalda el límite inicial para la carga probada. [Medición y condiciones de la corrida](docs/cierre-2026-11-04.md#concurrencia-y-apagado-medidos).
+`MAX_CONCURRENT_REQUESTS` implementa **Contrapresión (Backpressure)**. Cuando se llenan los cupos, `/process` responde inmediatamente `503` con `Retry-After: 1` antes de leer el cuerpo del siguiente PDF. El límite reduce la cantidad de PDFs pesados y datos de procesamiento que la API mantiene en memoria a la vez, lo que reduce el riesgo de agotamiento de memoria (OOM).
 
-SOLID/Clean Code: la frontera valida entrada, el orquestador decide el flujo, los clientes contienen contratos HTTP y los schemas validan datos. Los protocolos existentes permiten probar el orquestador sin red (inversión de dependencias); cada capa tiene una responsabilidad. Se conservaron estas capas y las dependencias bloqueadas, sin fábricas ni interfaces nuevas, sin reintentos POST y sin Redis en la API.
+El 04/11/2026, el stack Docker aislado con Extractor y Documents reales, MongoDB 7 y caché del Extractor desactivada registró un pico de **255,13 MiB** en la API. La medición usó una réplica con 1 CPU, 512 MiB y dos solicitudes concurrentes con variantes del PDF de 279 páginas. [Medición y condiciones de la corrida](docs/cierre-2026-11-04.md#concurrencia-y-apagado-medidos).

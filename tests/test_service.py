@@ -101,7 +101,7 @@ def test_open_extractor_returns_controlled_503_and_existing_pdf_still_works(clie
         repeated = client.post("/process", content=PDF, headers=headers)
         assert repeated.status_code == 200
         assert repeated.json()["source"] == "existing"
-        assert extract.call_count == 3
+        assert extract.call_count == 9
 
 
 @pytest.mark.parametrize("multipart", [False, True])

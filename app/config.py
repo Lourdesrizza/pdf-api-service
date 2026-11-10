@@ -9,8 +9,8 @@ BEARER_TOKEN_PATTERN = r"[A-Za-z0-9._~+/-]{32,512}={0,2}"
 
 
 class Settings(BaseSettings):
-    extractor_url: str = "http://extractor:8000"
-    document_service_url: str = "http://documents:8000"
+    extractor_url: str = "http://extractor.universidad.localhost"
+    document_service_url: str = "http://documents.universidad.localhost"
     documents_api_token: SecretStr = SecretStr("")
     api_require_auth: bool = False
     api_access_token: SecretStr = SecretStr("")
